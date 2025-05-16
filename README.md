@@ -7,11 +7,16 @@ This project aims to build a large-scale, stylized 3D world with MMO (Massively 
 **Core Ideas:**
 
 *   **Huge Map (Potentially Entire World):** Start with a large, procedurally generated or heightmap-based continent/region, designed for future scalability.
-*   **Stylized Visuals:** Employ a low-resolution grid-line aesthetic for the heightmap mesh, achieved via shaders on dynamically loaded terrain chunks.
+*   **Stylized Visuals:** Employ a low-resolution grid-line aesthetic for the heightmap mesh, achieved via shaders on a dynamically updated single plane.
 *   **Gameplay - MMO Resource Management:** A top-down or isometric perspective where players can place buildings, gather resources, and interact with a persistent world and other players.
-*   **Level of Detail (LOD) & Chunk Loading:** The world will be divided into chunks. Chunks near the player's view will be loaded with varying levels of detail based on camera proximity.
+*   **Dynamic Vertex Updates:** The world will be a single, large plane. As the camera/viewport moves, the vertices of the plane will be updated based on the visible portion of a large heightmap.
 
-## 2. Proposed Tech Stack
+## 2. Roles
+
+*   **AI (Claude):** Programmer. Responsible for implementing the code, solving technical problems, and providing technical advice.
+*   **User (You):** Creative Lead. Responsible for defining the vision, providing feedback, and making creative decisions.
+
+## 3. Proposed Tech Stack
 
 ### Frontend:
 
@@ -28,13 +33,13 @@ This project aims to build a large-scale, stylized 3D world with MMO (Massively 
 *   **UI Components:**
     *   Options: Material UI, Chakra UI, Ant Design, or Tailwind CSS.
 
-### 3D Map Specifics & LOD:
+### 3D Map Specifics & Dynamic Vertex Updates:
 
-*   **Custom LOD & Chunking System:**
+*   **Single Plane with Dynamic Vertex Updates:**
     *   **Heightmap Processing:** Tiled heightmaps for the vast world.
-    *   **Chunking:** Grid-based world division.
+    *   **Dynamic Vertex Updates:** As the camera/viewport moves, calculate which portion of the large heightmap corresponds to the current view. Update the vertices of the single plane to match the heights from that visible portion of the heightmap.
     *   **Mesh Generation:** Potentially in Web Workers for terrain chunks.
-    *   **LOD Management:** Quadtree/Octree for dynamic loading/unloading and LOD switching of chunks. Grid-line shader applied here.
+    *   **LOD Management:** Simulate LOD by reducing the number of segments in the plane for distant views.
     *   **Instancing:** `THREE.InstancedMesh` via R3F for numerous similar objects.
     *   *Inspiration:* `surviving-maps-3d` ([Ocelloid/surviving-maps-3d on GitHub](https://github.com/Ocelloid/surviving-maps-3d)).
 
@@ -58,18 +63,19 @@ This project aims to build a large-scale, stylized 3D world with MMO (Massively 
 
 *   **Git & GitHub/GitLab/Bitbucket.**
 
-## 3. Development Plan - Phased Approach
+## 4. Development Plan - Phased Approach
 
 1.  **Phase 1: Vertical Slice - Core Rendering (Frontend)**
     *   **Setup:** Initialize project with Vite, React, React Three Fiber, and Drei.
-    *   **Terrain:** Create a single, large, procedurally generated or static heightmap-based terrain chunk.
+    *   **Terrain:** Create a single, large, procedurally generated or static heightmap-based terrain plane.
     *   **Styling:** Implement the grid-line shader on the terrain.
     *   **Camera:** Set up camera controls suitable for a top-down/isometric view (e.g., `MapControls` or `OrbitControls` from Drei, configured appropriately).
+    *   **Dynamic Vertex Updates:** Implement the logic to update the vertices of the plane based on the camera position and the visible portion of the heightmap.
 
-2.  **Phase 2: Chunking & LOD (Frontend)**
-    *   **Chunk System:** Design and implement a basic chunking system. Divide the initial terrain into a few manageable chunks.
-    *   **Dynamic Loading:** Implement logic to load/unload chunks based on camera position (initially, a simple proximity check).
-    *   **LOD Implementation:** Introduce at least two levels of detail for terrain chunks (e.g., a high-poly version when close, a low-poly or impostor when far).
+2.  **Phase 2: LOD & Optimization (Frontend)**
+    *   **LOD Implementation:** Introduce a simple LOD system by reducing the number of segments in the plane for distant views.
+    *   **Performance Optimization:** Profile and optimize the dynamic vertex update process.
+    *   **Consider using Web Workers for vertex calculations.**
 
 3.  **Phase 3: Basic Gameplay Mechanics (Client-Side)**
     *   **State Management:** Integrate Zustand for managing UI and client-side game state.
@@ -87,11 +93,50 @@ This project aims to build a large-scale, stylized 3D world with MMO (Massively 
     *   **Resource System:** Design and implement resource nodes on the map and resource gathering.
     *   **Building Mechanics:** Develop more complex building types with functions.
     *   **UI/UX:** Refine the user interface for gameplay actions.
-    *   **Map Expansion:** Gradually increase the size of the explorable world, refining the chunking and LOD systems.
+    *   **Map Expansion:** Gradually increase the size of the explorable world, refining the dynamic vertex update system.
     *   **Advanced Multiplayer:** Implement more complex interactions, trading, etc.
     *   **Optimization:** Continuously profile and optimize both frontend and backend performance.
 
-## 4. Next Immediate Steps
+## 5. Todo List
+
+### Phase 1: Vertical Slice - Core Rendering (Frontend)
+
+*   [ ] Initialize project with Vite, React, React Three Fiber, and Drei.
+*   [ ] Create a single, large, procedurally generated or static heightmap-based terrain plane.
+*   [ ] Implement the grid-line shader on the terrain.
+*   [ ] Set up camera controls suitable for a top-down/isometric view.
+*   [ ] Implement the logic to update the vertices of the plane based on the camera position and the visible portion of the heightmap.
+
+### Phase 2: LOD & Optimization (Frontend)
+
+*   [ ] Introduce a simple LOD system by reducing the number of segments in the plane for distant views.
+*   [ ] Profile and optimize the dynamic vertex update process.
+*   [ ] Consider using Web Workers for vertex calculations.
+
+### Phase 3: Basic Gameplay Mechanics (Client-Side)
+
+*   [ ] Integrate Zustand for managing UI and client-side game state.
+*   [ ] Allow basic interaction, e.g., selecting a point on the terrain.
+*   [ ] Implement client-side logic for placing a simple building (e.g., a cube) on the terrain. State managed by Zustand.
+
+### Phase 4: Backend Setup & Initial Multiplayer
+
+*   [ ] Select and set up a basic backend (e.g., Node.js with NestJS or Nakama).
+*   [ ] Implement WebSocket communication.
+*   [ ] Basic user authentication and session management.
+*   [ ] Store basic player data (e.g., position, placed buildings) in a database.
+*   [ ] Synchronize the placement of a simple object across connected clients.
+
+### Phase 5: Expanding Gameplay & Features (Iterative)
+
+*   [ ] Design and implement resource nodes on the map and resource gathering.
+*   [ ] Develop more complex building types with functions.
+*   [ ] Refine the user interface for gameplay actions.
+*   [ ] Gradually increase the size of the explorable world, refining the dynamic vertex update system.
+*   [ ] Implement more complex interactions, trading, etc.
+*   [ ] Continuously profile and optimize both frontend and backend performance.
+
+## 6. Next Immediate Steps
 
 1.  Initialize this `vertexworld_mmo` directory as a Git repository.
 2.  Commit this `README.md`.
