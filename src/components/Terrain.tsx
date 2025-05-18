@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 import * as THREE from 'three';
 import { useThree } from '@react-three/fiber';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
@@ -7,38 +7,21 @@ import { WireframeGeometry2 } from 'three/examples/jsm/lines/WireframeGeometry2.
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { useTerrainStore } from '../store/terrainStore';
+import type { HeightmapTile } from '../utils/heightmapProvider';
+import { OpenTopographyProvider } from '../utils/heightmapProvider';
 
-interface HeightData {
-  data: Uint8ClampedArray;
-  width: number;
-  height: number;
+const provider = new OpenTopographyProvider('2c23752a27db60c1d1b2a1c9ba672980');
+
+interface TerrainProps {
+  setHeightData?: (data: HeightmapTile | null) => void;
 }
 
-function getHeightData(img: HTMLImageElement): HeightData | null {
-  const canvas = document.createElement('canvas');
-  canvas.width = img.width;
-  canvas.height = img.height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    console.error('Could not get 2D context');
-    return null;
-  }
-  
-  ctx.drawImage(img, 0, 0);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  
-  return {
-    data: imageData.data,
-    width: imageData.width,
-    height: imageData.height
-  };
-}
-
-const Terrain: React.FC = () => {
-  const [heightData, setHeightData] = useState<HeightData | null>(null);
+const Terrain: React.FC<TerrainProps> = ({ setHeightData }) => {
+  const [heightData, _setHeightData] = useState<HeightmapTile | null>(null);
+  const [showDebugHeightmap, setShowDebugHeightmap] = useState(false);
+  const debugCanvasRef = useRef<HTMLCanvasElement>(null);
   const size = useThree((state) => state.size);
   const [terrainMeshRef, setTerrainMeshRef] = useState<THREE.Mesh | null>(null);
-  const [showDiagonals, setShowDiagonals] = useState(true);
   
   const {
     wireframeWidth,
@@ -46,21 +29,33 @@ const Terrain: React.FC = () => {
     heightScale,
     segments,
     size: terrainSize,
+    showDiagonals,
   } = useTerrainStore();
 
   useEffect(() => {
-    const img = new Image();
-    img.onload = () => {
-      const data = getHeightData(img);
-      if (data) {
-        setHeightData(data);
-      }
-    };
-    img.onerror = (err) => {
-      console.error('Error loading image:', err);
-    };
-    img.src = '/assets/heightmap.png';
-  }, []);
+    provider.getHeightmapTile(6, 33, 22)
+      .then((data) => {
+        console.log('Terrain loaded heightData:', data);
+        // Log min/max elevation
+        let min = Infinity, max = -Infinity;
+        for (let y = 0; y < data.height; y++) {
+          for (let x = 0; x < data.width; x++) {
+            const v = data.data[y][x];
+            if (v < min) min = v;
+            if (v > max) max = v;
+          }
+        }
+        console.log('Elevation min:', min, 'max:', max);
+        _setHeightData(data);
+        if (setHeightData) {
+          console.log('Calling setHeightData prop from Terrain');
+          setHeightData(data);
+        }
+      })
+      .catch((err) => {
+        console.error('Error loading heightData from provider:', err);
+      });
+  }, [setHeightData]);
 
   // Add a simple test mesh to debug water intersection
   const testMesh = useMemo(() => {
@@ -90,7 +85,8 @@ const Terrain: React.FC = () => {
         const validPx = Math.max(0, Math.min(px, width - 1));
         const validPy = Math.max(0, Math.min(py, height - 1));
 
-        const heightValue = data[(validPy * width + validPx) * 4] / 255;
+        // Use the mock provider's data directly
+        const heightValue = data[validPy][validPx] / 255;
         vertices[i + 1] = heightValue * heightScale;
       }
 
@@ -181,9 +177,11 @@ const Terrain: React.FC = () => {
 
   // Toggle wireframe type with 'w' key
   useEffect(() => {
+    const { setShowDiagonals } = useTerrainStore.getState();
+    
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'w') {
-        setShowDiagonals(prev => !prev);
+        setShowDiagonals(!showDiagonals);
         console.log('Wireframe with diagonals:', !showDiagonals);
       }
     };
@@ -235,6 +233,78 @@ const Terrain: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showDebugBox]);
 
+  // Log when heightData is loaded
+  useEffect(() => {
+    if (heightData) {
+      console.log('Height data loaded', heightData);
+    }
+  }, [heightData]);
+
+  // Debug: draw heightmap to canvas when data changes
+  useEffect(() => {
+    if (!showDebugHeightmap) return;
+    if (!heightData) {
+      console.log('Debug window open, but no heightData');
+      return;
+    }
+    if (!debugCanvasRef.current) {
+      console.log('Debug window open, but no canvas ref');
+      return;
+    }
+    const { width, height, data } = heightData;
+    const canvas = debugCanvasRef.current;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const imgData = ctx.createImageData(width, height);
+    // Find min/max for normalization
+    let min = Infinity, max = -Infinity;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const v = data[y][x];
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    }
+    // Write pixels
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        // Normalize to 0-255
+        const norm = (data[y][x] - min) / (max - min || 1);
+        const val = Math.round(norm * 255);
+        imgData.data[idx] = val;
+        imgData.data[idx + 1] = val;
+        imgData.data[idx + 2] = val;
+        imgData.data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    console.log('Rendered debug heightmap to canvas');
+  }, [showDebugHeightmap, heightData]);
+
+  // Toggle debug heightmap with 'h' key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'h') {
+        setShowDebugHeightmap(v => {
+          console.log('Toggling debug window:', !v);
+          return !v;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Only log outside of JSX
+  useEffect(() => {
+    if (showDebugHeightmap && heightData) {
+      console.log('Rendering debug window with heightData');
+    }
+  }, [showDebugHeightmap, heightData]);
+
   return (
     <>
       <primitive object={terrainMesh} />
@@ -243,8 +313,6 @@ const Terrain: React.FC = () => {
       ) : (
         <primitive object={wireframeWithoutDiagonals} />
       )}
-      
-      {/* Optional debug box to test water intersection */}
       {showDebugBox && (
         <mesh position={[0, 50, 0]}>
           <boxGeometry args={[100, 100, 100]} />
