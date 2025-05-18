@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { animate } from 'animejs';
+import BuildButton from './BuildButton';
 
 interface Command {
   name: string;
@@ -9,6 +10,8 @@ interface Command {
 interface CommandListProps {
   commands: Command[];
   onCommand: (commandName: string) => void;
+  isBuildTab?: boolean;
+  buildQueue?: Record<string, { queueCount: number; progress: number }>;
 }
 
 const icons: { [key: string]: string } = {
@@ -17,7 +20,7 @@ const icons: { [key: string]: string } = {
   'Approach Vehicles 0/5': '🚗', 'Data Center': '🏭', 'Small DC': '🏭', 'Large DC': '🏭', 'Firewall Node': '🔒'
 };
 
-export default function CommandList({ commands, onCommand }: CommandListProps) {
+export default function CommandList({ commands, onCommand, isBuildTab = false, buildQueue = {} }: CommandListProps) {
   const activeDropdownRef = useRef<HTMLUListElement | null>(null);
 
   const toggleDropdown = (dropdownElement: HTMLUListElement | null) => {
@@ -55,30 +58,39 @@ export default function CommandList({ commands, onCommand }: CommandListProps) {
 
   return (
     <ul id="command-list" className="space-y-2" aria-live="polite">
-      {commands.map((item, index) => (
-        <li key={index} className="relative">
-          <button 
-            className="w-full text-left px-3 py-2 text-sm uppercase border-2 border-red-600 bg-[#181f2a] bg-opacity-100 hover:bg-red-600 hover:text-gray-900 transition glow scanlines"
-            onClick={(e) => {
-              const nextElement = e.currentTarget.nextElementSibling as HTMLUListElement | null;
-              if (item.sub && item.sub.length) {
-                toggleDropdown(nextElement);
-              } else {
-                onCommand(item.name);
-              }
-            }}
-          >
-            {icons[item.name] || '❓'} {item.name}
-          </button>
-          {item.sub && item.sub.length > 0 && (
-            <ul className="dropdown-content bg-[#181f2a] mt-1 overflow-hidden" style={{ height: '0px' }}>
-              {item.sub.map(subItem => (
-                <li key={subItem}>
-                  <button 
+      {commands.map((cmd) => (
+        <li key={cmd.name} className="relative">
+          {isBuildTab ? (
+            <BuildButton
+              label={cmd.name}
+              queueCount={buildQueue[cmd.name]?.queueCount || 1}
+              progress={buildQueue[cmd.name]?.progress || 0}
+              onClick={() => onCommand(cmd.name)}
+            />
+          ) : (
+            <button
+              className="w-full text-left px-3 py-2 text-sm uppercase border-2 border-red-600 bg-[#181f2a] bg-opacity-100 hover:bg-red-600 hover:text-gray-900 transition glow scanlines"
+              onClick={(e) => {
+                const nextElement = e.currentTarget.nextElementSibling as HTMLUListElement | null;
+                if (cmd.sub && cmd.sub.length) {
+                  toggleDropdown(nextElement);
+                } else {
+                  onCommand(cmd.name);
+                }
+              }}
+            >
+              {icons[cmd.name] || '❓'} {cmd.name}
+            </button>
+          )}
+          {cmd.sub && cmd.sub.length > 0 && (
+            <ul className="dropdown-content scanlines bg-[#181f2a] mt-1 overflow-hidden" style={{ height: '0px' }}>
+              {cmd.sub.map((sub) => (
+                <li key={sub}>
+                  <button
                     className="w-full text-left px-4 py-1 text-xs uppercase border-l-2 border-red-600 bg-[#181f2a] hover:bg-red-600 hover:text-gray-900 transition glow scanlines build-sub"
-                    onClick={() => onCommand(subItem)}
+                    onClick={() => onCommand(sub)}
                   >
-                    {icons[subItem] || '❓'} {subItem}
+                    {icons[sub] || '❓'} {sub}
                   </button>
                 </li>
               ))}
