@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import CommandList from "./CommandList";
 import Preview from "./Preview";
 // animejs import and usage will be deferred due to import issues
@@ -37,14 +37,15 @@ export default function Sidebar({}: SidebarProps) {
   const currentCommands = activeTab === "intel" ? intelCommandsData : buildCommandsData;
 
   return (
-    <aside className="w-1/4 border-2 border-red-600 p-4 space-y-4 bg-gray-900 text-red-400 font-mono">
-      <ul role="tablist" className="flex w-full">
+    <div className="w-full h-full">
+      <ul role="tablist" className="flex w-full bg-[#181f2a]">
         {tabs.map(tab => (
-          <li key={tab.id} className="w-1/2">
+          <li key={tab.id} role="presentation" className="w-1/2">
             <button
+              id={`tab-${tab.id}`}
               role="tab"
               aria-selected={activeTab === tab.id}
-              className={`w-full px-4 py-2 text-sm uppercase glow scanlines ${activeTab === tab.id ? "tab-active" : "tab-inactive"} ${activeTab === 'intel' && tab.id === 'build' ? 'border-l-0' : ''} ${activeTab === 'build' && tab.id === 'intel' ? 'border-r-0' : ''} border-t border-b border-red-600 ${ (activeTab === tab.id) ? 'border-x-red-600' : (tab.id === 'intel' ? 'border-l-red-600' : 'border-r-red-600')}`}
+              className={`w-full px-4 py-2 text-sm uppercase glow scanlines bg-[#181f2a] ${activeTab === tab.id ? "tab-active" : "tab-inactive"} ${tab.id === 'build' ? 'border-t border-r border-b border-red-600' : ''}`}
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
@@ -57,7 +58,7 @@ export default function Sidebar({}: SidebarProps) {
         onCommand={handleCommandSelected} 
       />
       <Preview /> 
-      <div className="text-xs uppercase">Status: Online</div>
-    </aside>
+      <div className="text-xs uppercase bg-[#181f2a] px-2 py-1 mt-4">Status: Online</div>
+    </div>
   );
 } 

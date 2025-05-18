@@ -58,7 +58,7 @@ export default function CommandList({ commands, onCommand }: CommandListProps) {
       {commands.map((item, index) => (
         <li key={index} className="relative">
           <button 
-            className="w-full text-left px-3 py-2 text-sm uppercase border-2 border-red-600 hover:bg-red-600 hover:text-gray-900 transition glow scanlines"
+            className="w-full text-left px-3 py-2 text-sm uppercase border-2 border-red-600 bg-[#181f2a] bg-opacity-100 hover:bg-red-600 hover:text-gray-900 transition glow scanlines"
             onClick={(e) => {
               const nextElement = e.currentTarget.nextElementSibling as HTMLUListElement | null;
               if (item.sub && item.sub.length) {
@@ -71,11 +71,11 @@ export default function CommandList({ commands, onCommand }: CommandListProps) {
             {icons[item.name] || '❓'} {item.name}
           </button>
           {item.sub && item.sub.length > 0 && (
-            <ul className="dropdown-content bg-gray-800 mt-1 overflow-hidden" style={{ height: '0px' }}>
+            <ul className="dropdown-content bg-[#181f2a] mt-1 overflow-hidden" style={{ height: '0px' }}>
               {item.sub.map(subItem => (
                 <li key={subItem}>
                   <button 
-                    className="w-full text-left px-4 py-1 text-xs uppercase border-l-2 border-red-600 hover:bg-red-600 hover:text-gray-900 transition glow scanlines build-sub"
+                    className="w-full text-left px-4 py-1 text-xs uppercase border-l-2 border-red-600 bg-[#181f2a] hover:bg-red-600 hover:text-gray-900 transition glow scanlines build-sub"
                     onClick={() => onCommand(subItem)}
                   >
                     {icons[subItem] || '❓'} {subItem}
