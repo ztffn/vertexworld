@@ -1,0 +1,178 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+ANIME.JS INSTALLATION AND USAGE GUDE.
+MUST FOLLOW
+
+NPM development scripts
+
+First, run npm i to install all the necessary packages. Then, execute the following scripts with npm run <script>.
+script 	action
+dev 	Watch any changes in src/ and compiles the esm version to lib/anime.esm.js
+dev-types 	Same as dev, but also run TypeScript and generate the types/index.d.ts file
+build 	Generate types definition and compiles ESM / UMD / IIFE versions to lib/
+test-browser 	Start a local server and start all browser related tests
+test-node 	Start all Node related tests
+open-examples 	Start a local server to browse the examples locally
+
+Anime.js V4 works by importing ES modules like so:
+import {
+  animate,
+  stagger,
+} from 'animejs';
+
+animate('.square', {
+  x: 320,
+  rotate: { from: -180 },
+  duration: 1250,
+  delay: stagger(65, { from: 'center' }),
+  ease: 'inOutQuint',
+  loop: true,
+  alternate: true
+});
+
+V4 Documentation
+
+The full documentation is available here. https://animejs.com/documentation
+You can find the v3 to v4 migration guide here. https://github.com/juliangarnier/anime/wiki/Migrating-from-v3-to-v4
+
+ Installation
+
+Anime.js can be installed in multiple ways depending of your environment or workflow.
+This section covers differents methods of installation.
+Installation via NPM and a bundler
+
+If you're using a bundler like Vite or esbuild, simply install the package via NPM.
+
+npm install animejs
+
+Then import Anime.js methods as ES6 Modules like this:
+
+import { animate } from 'animejs';
+
+Linking from a CDN
+CDN Name 	URL
+JsDelivr 	jsdelivr.com
+ES6 Modules
+
+<script type="module">
+  import { animate } from 'https://cdn.jsdelivr.net/npm/animejs/+esm';
+</script>
+
+Global object
+
+<script src="https://cdn.jsdelivr.net/npm/animejs/lib/anime.iife.min.js"></script>
+
+<script>
+  const { animate } = anime;
+</script>
+
+Direct download from GitHub
+
+If you prefer to download the Anime.js library manually, you can also simply grab the code from the official GitHub repository.
+
+The following versions are available in the /lib directory:
+File name 	Type
+anime.esm.js 	ES6 Module
+anime.umd.js 	Universal Module
+anime.iife.js 	Global Object
+
+Once downloaded inside your project folder, link the library in your code like this:
+ES6 Modules
+
+<script type="module">
+  import { animate } from './path/to/anime.esm.min.js';
+</script>
+
+Global object
+
+<script src="path/to/anime.iife.min.js"></script>
+
+<script>
+  const { animate } = anime;
+</script>
+
+
+### Using with React
+
+Anime.js can be used with React by combining React's useEffect() and Anime.js createScope() methods.
+
+The following example showcase how to uses Anime.js methods straight into React code.
+Using with React code example
+
+import { animate, createScope, createSpring, createDraggable } from 'animejs';
+import { useEffect, useRef, useState } from 'react';
+import reactLogo from './assets/react.svg';
+import './App.css';
+
+function App() {
+  const root = useRef(null);
+  const scope = useRef(null);
+  const [ rotations, setRotations ] = useState(0);
+
+  useEffect(() => {
+  
+    scope.current = createScope({ root }).add( self => {
+    
+      // Every anime.js instances declared here are now scopped to <div ref={root}>
+
+      // Created a bounce animation loop
+      animate('.logo', {
+        scale: [
+          { to: 1.25, ease: 'inOut(3)', duration: 200 },
+          { to: 1, ease: createSpring({ stiffness: 300 }) }
+        ],
+        loop: true,
+        loopDelay: 250,
+      });
+      
+      // Make the logo draggable around its center
+      createDraggable('.logo', {
+        container: [0, 0, 0, 0],
+        releaseEase: createSpring({ stiffness: 200 })
+      });
+
+      // Register function methods to be used outside the useEffect
+      self.add('rotateLogo', (i) => {
+        animate('.logo', {
+          rotate: i * 360,
+          ease: 'out(4)',
+          duration: 1500,
+        });
+      });
+
+    });
+
+    // Properly cleanup all anime.js instances declared inside the scope
+    return () => scope.current.revert()
+
+  }, []);
+
+  const handleClick = () => {
+    setRotations(prev => {
+      const newRotations = prev + 1;
+      // Animate logo rotation on click using the method declared inside the scope
+      scope.current.methods.rotateLogo(newRotations);
+      return newRotations;
+    });
+  };
+
+  return (
+    <div ref={root}>
+      <div className="large centered row">
+        <img src={reactLogo} className="logo react" alt="React logo" />
+      </div>
+      <div className="medium row">
+        <fieldset className="controls">
+        <button onClick={handleClick}>rotations: {rotations}</button>
+        </fieldset>
+      </div>
+    </div>
+  )
+}
+
+export default App;
+
+

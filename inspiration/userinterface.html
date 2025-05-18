@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retro Hacking UI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" defer></script>
+  <style>
+    /* Global Effects */
+    body { background: #111827; color: #DC2626; font-family: monospace; margin: 0; }
+    .glow { box-shadow: 0 0 2px rgba(255,50,50,0.3), 0 0 4px rgba(255,50,50,0.15); }
+    .scanlines::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: repeating-linear-gradient(
+        rgba(0,0,0,0.1) 0px,
+        rgba(0,0,0,0.1) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      pointer-events: none;
+      z-index: 2;
+    }
+    .scanlines { position: relative; overflow: hidden; }
+    .crt-noise {
+      position: absolute; inset: 0;
+      background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAIklEQVQoU2NkYGBg+A8EGhgaGBgYGBgYGBgYGABBgAFLAECwElOWQAAAABJRU5ErkJggg==') repeat;
+      opacity: 0.02;
+      animation: noise 0.2s steps(3) infinite;
+      pointer-events: none;
+    }
+    @keyframes noise { 0%,100%{background-position:0 0}10%{background-position:-5px 5px}20%{background-position:-10px -5px}30%{background-position:5px -10px}40%{background-position:-5px 10px}50%{background-position:10px 5px}60%{background-position:-10px 5px}70%{background-position:5px -5px}80%{background-position:-5px -10px}90%{background-position:10px 10px}}    
+    /* Tabs */
+    .tab-active { background-color: #DC2626; color: #1F2937; border: 2px solid #DC2626; border-bottom-width: 0; cursor: pointer; }
+    .tab-inactive { background-color: #111827; color: #F87171; border: 2px solid #DC2626; cursor: pointer; }
+    .tab-active:hover, .tab-inactive:hover { background-color: #B91C1C; color: #1F2937; }
+    /* Sidebar Command Button */
+    .command-btn { width: 100%; text-left; padding: 0.5rem; text-transform: uppercase; border: 2px solid #DC2626; }
+    .command-btn:hover { background-color: #DC2626; color: #1F2937; }
+    /* Dropdown */
+    .dropdown-container { position: relative; }
+    .dropdown-content { list-style: none; margin: 0; padding: 0; overflow: hidden; height: 0; }
+    .dropdown-content li > button { width: 100%; padding: 0.5rem 1rem; text-transform: uppercase; border-left: 2px solid #DC2626; background: transparent; }
+    .dropdown-content li > button:hover { background-color: #DC2626; color: #1F2937; }
+    .dropdown-container.active > .dropdown-toggle { background-color: #DC2626; color: #FFFFFF; }
+  </style>
+</head>
+<body class="bg-gray-900 text-red-400 font-mono antialiased">
+  <div class="h-screen flex relative">
+    <div class="crt-noise"></div>
+    <!-- Sidebar -->
+    <aside class="w-1/4 border-2 border-red-600 p-4 space-y-4">
+      <!-- Tabs -->
+      <div class="flex">
+        <button id="tab-intel" class="flex-1 tab-active glow">Intel</button>
+        <button id="tab-build" class="flex-1 tab-inactive glow">Build</button>
+      </div>
+      <!-- Commands -->
+      <div id="command-list" class="space-y-2" aria-live="polite"></div>
+      <!-- Preview -->
+      <div id="preview" class="border-2 border-red-600 h-32 scanlines overflow-hidden flex items-center justify-center glow relative">
+        <div id="preview-content" class="text-xs uppercase text-center">Select a command</div>
+        <div id="queue-indicator" class="absolute top-1 right-1 bg-red-600 text-gray-900 text-[10px] px-1 rounded animate-pulse hidden"></div>
+      </div>
+      <div class="text-xs uppercase">Status: Online</div>
+    </aside>
+    <!-- Main Panel -->
+    <main class="flex-1 flex flex-col p-4">
+      <div class="flex-1 relative">
+        <div class="absolute inset-0 scanlines mix-blend-overlay border-2 border-red-600 glow"></div>
+        <div class="relative h-full bg-gray-800 border-2 border-red-600 rounded-lg flex items-center justify-center glow scanlines">
+          <!-- Resource Stats -->
+          <div class="absolute top-4 left-4 space-y-1 text-xs" aria-live="polite">
+            <div class="border-2 border-red-600 p-1 rounded scanlines">CPU Cores: 128</div>
+            <div class="border-2 border-red-600 p-1 rounded scanlines">Bandwidth: 10Gbps</div>
+            <div class="border-2 border-red-600 p-1 rounded scanlines">Energon: 75%</div>
+          </div>
+          <!-- Map Placeholder -->
+          <span class="uppercase text-xs opacity-75">3D Wireframe Grid</span>
+          <!-- Overlay Table -->
+          <div class="absolute bottom-16 left-4 w-40 bg-gray-900 border-2 border-red-600 glow scanlines text-xs">
+            <div class="bg-red-600 px-2 py-1 uppercase">Player Take</div>
+            <div class="flex justify-between px-2 py-1 border-t border-red-600"><span>Host</span><span>2,550,000</span></div>
+            <div class="flex justify-between px-2 py-1 border-t border-red-600"><span>Player 1</span><span>1,200,000</span></div>
+            <div class="flex justify-between px-2 py-1 border-t border-red-600"><span>Player 2</span><span>900,000</span></div>
+          </div>
+          <!-- Warning Banner -->
+          <div class="absolute bottom-4 right-4 border-2 border-red-600 px-4 py-1 uppercase text-xs bg-red-600 text-gray-900 glow scanlines warning">⚠ Hard Mode Active ⚠</div>
+        </div>
+      </div>
+      <footer class="flex justify-between text-xs uppercase mt-4">
+        <div class="space-x-4"><span>Menu: Esc</span><span>Overlay: Tab</span><span>PX Zoom: Z/X</span></div>
+        <div class="space-x-4"><span>Deploy: D</span><span>Build: B</span><span>Hack: H</span></div>
+      </footer>
+    </main>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const intelCommands = [
+        { name: 'Approach Vehicles', sub: [] },
+        { name: 'Weapons', sub: ['Pistol', 'Rifle', 'Grenade'] },
+        { name: 'Disruption', sub: ['EMP', 'Hack Drone'] },
+        { name: 'Equipment', sub: ['Armor', 'Shield'] }
+      ];
+      const buildCommands = [
+        { name: 'Data Center', sub: ['Small DC', 'Large DC'] },
+        { name: 'Firewall Node', sub: [] }
+      ];
+      const cmdList = document.getElementById('command-list');
+      const previewContent = document.getElementById('preview-content');
+      const queueIndicator = document.getElementById('queue-indicator');
+      const icons = {
+        'Approach Vehicles': '🚗', 'Weapons': '🔫', 'Pistol': '🔫', 'Rifle': '🗡️', 'Grenade': '💣',
+        'Disruption': '⚡', 'EMP': '⚡', 'Hack Drone': '🤖', 'Equipment': '🛠️', 'Armor': '🛡️', 'Shield': '🛡️',
+        'Data Center': '🏭', 'Small DC': '🏭', 'Large DC': '🏭', 'Firewall Node': '🔒'
+      };
+      let buildQueue = [];
+      function updateQueue() {
+        if (buildQueue.length > 1) {
+          queueIndicator.textContent = '+' + (buildQueue.length - 1);
+          queueIndicator.classList.remove('hidden');
+        } else {
+          queueIndicator.classList.add('hidden');
+        }
+      }
+      function showPreview(cmd, building) {
+        previewContent.innerHTML = '';
+        const icon = document.createElement('div');
+        icon.className = 'text-3xl';
+        icon.textContent = icons[cmd] || '❓';
+        const label = document.createElement('span');
+        label.textContent = cmd;
+        previewContent.append(icon, label);
+        if (building) {
+          const spinner = document.createElement('div');
+          spinner.className = 'mt-2 w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin';
+          previewContent.append(spinner);
+        }
+      }
+      function processQueue() {
+        if (!buildQueue.length) return;
+        const cmd = buildQueue[0];
+        showPreview(cmd, true);
+        setTimeout(() => {
+          showPreview(cmd, false);
+          buildQueue.shift();
+          updateQueue();
+          if (buildQueue.length) processQueue();
+        }, 3000 + Math.random() * 2000);
+      }
+      function enqueueBuild(cmd) {
+        buildQueue.push(cmd);
+        updateQueue();
+        if (buildQueue.length === 1) processQueue();
+      }
+      function loadCommands(data) {
+        cmdList.innerHTML = '';
+        data.forEach(item => {
+          const container = document.createElement('div');
+          container.className = 'dropdown-container scanlines';
+          const btn = document.createElement('button');
+          btn.className = 'command-btn glow';
+          btn.textContent = item.name;
+          btn.setAttribute('aria-expanded', 'false');
+          container.append(btn);
+          if (item.sub && item.sub.length) {
+            const ul = document.createElement('ul');
+            ul.className = 'dropdown-content scanlines';
+            ul.setAttribute('role', 'menu');
+            item.sub.forEach(sub => {
+              const li = document.createElement('li');
+              const subBtn = document.createElement('button');
+              subBtn.className = 'build-sub glow';
+              subBtn.setAttribute('role', 'menuitem');
+              subBtn.textContent = sub;
+              subBtn.addEventListener('click', () => enqueueBuild(sub));
+              li.append(subBtn);
+              ul.append(li);
+            });
+            container.append(ul);
+            btn.addEventListener('click', () => {
+              const open = ul.clientHeight > 0;
+              const start = open ? ul.scrollHeight + 'px' : '0px';
+              const end = open ? '0px' : ul.scrollHeight + 'px';
+              anime({
+                targets: ul,
+                height: [start, end],
+                easing: 'easeOutQuad',
+                duration: 300
+              });
+              container.classList.toggle('active', !open);
+              btn.setAttribute('aria-expanded', String(!open));
+            });
+          }
+          cmdList.append(container);
+        });
+      }
+      // Initialize
+      loadCommands(intelCommands);
+      document.getElementById('tab-intel').addEventListener('click', () => loadCommands(intelCommands));
+      document.getElementById('tab-build').addEventListener('click', () => loadCommands(buildCommands));
+      anime({
+        targets: '.glow',
+        boxShadow: ['0 0 2px rgba(255,50,50,0.3)', '0 0 6px rgba(255,50,50,0.5)'],
+        duration: 2000,
+        easing: 'easeInOutSine',
+        direction: 'alternate',
+        loop: true
+      });
+      anime({
+        targets: '.warning',
+        opacity: [0.6, 1],
+        duration: 1000,
+        easing: 'easeInOutSine',
+        direction: 'alternate',
+        loop: true
+      });
+    });
+  </script>
+</body>
+</html>
