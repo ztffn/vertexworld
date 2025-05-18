@@ -2,8 +2,8 @@ import React, { useMemo, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { useThree } from '@react-three/fiber';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
-import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import { Wireframe } from 'three/examples/jsm/lines/Wireframe.js';
+import { WireframeGeometry2 } from 'three/examples/jsm/lines/WireframeGeometry2.js';
 import { useTerrainStore } from '../store/terrainStore';
 
 interface HeightData {
@@ -98,59 +98,24 @@ const Terrain: React.FC = () => {
     return geometry;
   }, [heightData, heightScale, segments, terrainSize]);
 
+  // Create wireframe using the same approach as test.html
   const wireframe = useMemo(() => {
-    // Create arrays to store line positions
-    const positions = [];
-    const vertices = geometry.attributes.position.array;
-    const segmentSize = terrainSize / segments;
-
-    // Create horizontal lines
-    for (let i = 0; i <= segments; i++) {
-      for (let j = 0; j < segments; j++) {
-        const idx1 = i * (segments + 1) + j;
-        const idx2 = i * (segments + 1) + (j + 1);
-
-        positions.push(
-          vertices[idx1 * 3], vertices[idx1 * 3 + 1], vertices[idx1 * 3 + 2],
-          vertices[idx2 * 3], vertices[idx2 * 3 + 1], vertices[idx2 * 3 + 2]
-        );
-      }
-    }
-
-    // Create vertical lines
-    for (let i = 0; i < segments; i++) {
-      for (let j = 0; j <= segments; j++) {
-        const idx1 = i * (segments + 1) + j;
-        const idx2 = (i + 1) * (segments + 1) + j;
-
-        positions.push(
-          vertices[idx1 * 3], vertices[idx1 * 3 + 1], vertices[idx1 * 3 + 2],
-          vertices[idx2 * 3], vertices[idx2 * 3 + 1], vertices[idx2 * 3 + 2]
-        );
-      }
-    }
-
-    // Create line segments geometry
-    const lineGeometry = new LineSegmentsGeometry();
-    lineGeometry.setPositions(positions);
-
+    // Create wireframe geometry directly from the terrain geometry
+    const wireframeGeometry = new WireframeGeometry2(geometry);
+    
     // Create line material
-    const lineMaterial = new LineMaterial({
+    const wireframeMaterial = new LineMaterial({
       color: waterColor,
       linewidth: wireframeWidth,
-      opacity: 1.0, // Make it fully opaque for better visibility
-      transparent: true,
-      resolution: new THREE.Vector2(size.width, size.height),
-      dashed: false,
-      alphaToCoverage: true
+      resolution: new THREE.Vector2(size.width, size.height)
     });
 
-    // Create line segments
-    const lines = new LineSegments2(lineGeometry, lineMaterial);
-    lines.computeLineDistances();
-
-    return lines;
-  }, [geometry, wireframeWidth, waterColor, size.width, size.height, segments, terrainSize]);
+    // Create wireframe mesh
+    const wireframe = new Wireframe(wireframeGeometry, wireframeMaterial);
+    wireframe.computeLineDistances();
+    
+    return wireframe;
+  }, [geometry, wireframeWidth, waterColor, size.width, size.height]);
 
   // Update resolution when viewport changes
   useEffect(() => {

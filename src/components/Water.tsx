@@ -114,6 +114,14 @@ const Water: React.FC = () => {
   const [debugMode, setDebugMode] = useState(false);
   const [showDepthTexture, setShowDepthTexture] = useState(false);
 
+  // Store color as THREE.Color to prevent unneeded re-renders
+  const foamColorRef = useRef(new THREE.Color(waterColor));
+  
+  // Update color ref when waterColor changes
+  useEffect(() => {
+    foamColorRef.current.set(waterColor);
+  }, [waterColor]);
+
   // Create render target for depth
   const renderTarget = useMemo(() => {
     const pixelRatio = gl.getPixelRatio();
@@ -158,7 +166,7 @@ const Water: React.FC = () => {
 
   // Create water material
   const waterMaterial = useMemo(() => {
-    console.log("Creating new Water Material"); // Debug log
+    console.log("Creating new Water Material");
     const pixelRatio = gl.getPixelRatio();
     return new THREE.ShaderMaterial({
       vertexShader: waterVertexShader,
@@ -174,7 +182,7 @@ const Water: React.FC = () => {
           window.innerHeight * pixelRatio
         )},
         threshold: { value: threshold },
-        foamColor: { value: new THREE.Color(waterColor) },
+        foamColor: { value: foamColorRef.current },
         time: { value: 0 },
         secondaryFoamScale: { value: secondaryFoamScale },
         secondaryFoamWidth: { value: secondaryFoamWidth },
@@ -182,7 +190,7 @@ const Water: React.FC = () => {
       },
       transparent: true
     });
-  }, [gl, renderTarget, dudvMap, blueprintMap, camera, threshold, waterColor, secondaryFoamScale, secondaryFoamWidth, debugMode]);
+  }, [gl, renderTarget, dudvMap, blueprintMap, camera, threshold, secondaryFoamScale, secondaryFoamWidth, debugMode]);
 
   // Add debug keyboard control
   useEffect(() => {
@@ -260,42 +268,22 @@ const Water: React.FC = () => {
     waterMaterial.uniforms.threshold.value = threshold;
     waterMaterial.uniforms.secondaryFoamScale.value = secondaryFoamScale;
     waterMaterial.uniforms.secondaryFoamWidth.value = secondaryFoamWidth;
-    waterMaterial.uniforms.foamColor.value.set(waterColor);
+    waterMaterial.uniforms.foamColor.value = foamColorRef.current;
     waterMaterial.uniforms.debugMode.value = debugMode;
 
     // Standard depth pass as in test.html
     waterRef.current.visible = false;
-    const originalMaterials = new Map<THREE.Object3D, THREE.Material | THREE.Material[]>();
     
-    // Save original materials and apply depth material
-    if (terrainMeshes.current.length > 0) {
-      terrainMeshes.current.forEach(object => {
-        if (object instanceof THREE.Mesh) {
-          originalMaterials.set(object, object.material);
-          object.material = depthMaterial;
-        }
-      });
-    } else {
-      // Fallback to the original approach
-      scene.overrideMaterial = depthMaterial;
-    }
+    // Use the same scene.overrideMaterial approach as test.html for simplicity
+    scene.overrideMaterial = depthMaterial;
     
     // Render the depth
     gl.setRenderTarget(renderTarget);
     gl.clear();
     gl.render(scene, camera);
     
-    // Restore original materials
-    if (terrainMeshes.current.length > 0) {
-      originalMaterials.forEach((material, object) => {
-        if (object instanceof THREE.Mesh) {
-          object.material = material;
-        }
-      });
-    } else {
-      scene.overrideMaterial = null;
-    }
-    
+    // Reset
+    scene.overrideMaterial = null;
     waterRef.current.visible = true;
     gl.setRenderTarget(null);
   });
