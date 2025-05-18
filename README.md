@@ -63,70 +63,68 @@ The water shader in vertexworld has the following status:
 - ✅ Water level adjusts correctly
 - ✅ Foam color updates from the terrainStore
 - ✅ Secondary foam parameters are working
-- ❌ Issue: Only a single line appears down the center instead of outlining the entire terrain intersection
+- ✅ Terrain wireframe displays properly with clean lines
+- ✅ Shader now properly outlines the entire terrain intersection
 
 ## Debug Keyboard Controls
 
-We've added several keyboard controls to help debug the water shader:
+We've added several keyboard controls to help debug and customize the visualization:
 
 - Press `d` to toggle debug mode in the water shader (shows depth texture directly)
 - Press `t` to toggle visualization of the depth texture
 - Press `b` to toggle a debug box that should intersect with the water
+- Press `w` to toggle wireframe diagonals on/off
 
 ## Root Cause Analysis
 
-After comparing our implementation with test.html, I've identified these likely causes:
+The issues we fixed were:
 
 1. **Depth Buffer Capture Issue**
-   - The depth buffer might not be capturing the entire terrain mesh correctly
-   - React Three Fiber's render loop differs from the manual approach in test.html
+   - Fixed by ensuring the water is hidden during depth capture
+   - Used the same overrideMaterial approach as in test.html
 
 2. **Scene Management**
-   - The way we're handling scene.overrideMaterial might be different than test.html
-   - Object visibility might not be properly toggled between render passes
+   - Improved render order to ensure proper layering
+   - Added polygon offset to prevent z-fighting
 
 3. **Shader Uniform Synchronization**
-   - Camera properties and shader uniforms need to be perfectly synchronized
+   - Locked camera properties to stable values
+   - Set exact texture parameters to match test.html
 
 ## Implementation Changes
 
-To address these issues, we've made the following changes:
+The key improvements include:
 
 1. **Material Handling Improvement**
-   - Now directly setting material on meshes instead of using scene.overrideMaterial
-   - Added explicit tracking of terrain meshes in the scene
+   - Now using same wireframe approach as test.html
+   - Fixed polygon offset for clean wireframe rendering
 
 2. **Debug Visualization**
-   - Added ability to visualize the depth texture directly in the shader
-   - Added a debug box to test water intersections
+   - Added ability to visualize the depth texture
+   - Added toggles for different visualization modes
 
 3. **Terrain Mesh Refinement**
-   - Made terrain mesh fully opaque for better visibility
-   - Made terrain mesh explicitly cast/receive shadows
+   - Added option to toggle wireframe diagonals
+   - Fixed wireframe rendering issues
 
 4. **Improved Scene Management**
-   - Added proper tracking of scene objects
-   - Applied depth material directly to terrain meshes
+   - Set proper render order for objects
+   - Added proper reference handling for Three.js objects
 
 ## Next Steps
 
-If the water shader is still not working correctly, try:
+Some possible enhancements for the future:
 
-1. **Check Console Output**
-   - Look for logs about terrain meshes found (should be > 0)
-   - Verify texture loading is complete
+1. **Performance Optimization**
+   - Reduce render resolution for mobile devices
+   - Add level-of-detail for terrain mesh
 
-2. **Check Depth Buffer**
-   - Press `t` to visualize the depth buffer
-   - Press `d` to see raw depth values in shader
-   - Press `b` to add a test box that should definitely intersect with water
+2. **Extend Functionality**
+   - Add more water shader effects like caustics
+   - Support for dynamic terrain editing
 
-3. **Compare with test.html**
-   - Compare the real-time behavior with test.html
-   - Review texture parameters and shader uniforms
+3. **UI Improvements**
+   - Add onscreen controls for mobile users
+   - Create a help screen with keyboard controls
 
-4. **Alternative Approaches**
-   - If material approach fails, try using custom render passes 
-   - Consider simplifying the shader for testing
-
-This document will be updated as we make progress on the water shader implementation.
+This document will be updated as we make further improvements to the water shader implementation.

@@ -4,6 +4,8 @@ import { useThree } from '@react-three/fiber';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { Wireframe } from 'three/examples/jsm/lines/Wireframe.js';
 import { WireframeGeometry2 } from 'three/examples/jsm/lines/WireframeGeometry2.js';
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { useTerrainStore } from '../store/terrainStore';
 
 interface HeightData {
@@ -36,6 +38,7 @@ const Terrain: React.FC = () => {
   const [heightData, setHeightData] = useState<HeightData | null>(null);
   const size = useThree((state) => state.size);
   const [terrainMeshRef, setTerrainMeshRef] = useState<THREE.Mesh | null>(null);
+  const [showDiagonals, setShowDiagonals] = useState(true);
   
   const {
     wireframeWidth,
@@ -98,34 +101,96 @@ const Terrain: React.FC = () => {
     return geometry;
   }, [heightData, heightScale, segments, terrainSize]);
 
-  // Create wireframe using the same approach as test.html
-  const wireframe = useMemo(() => {
-    // Create wireframe geometry directly from the terrain geometry
+  // Create wireframe using the WireframeGeometry2 approach (with diagonals)
+  const wireframeWithDiagonals = useMemo(() => {
+    // Use WireframeGeometry2 for full wireframe with diagonals
     const wireframeGeometry = new WireframeGeometry2(geometry);
     
-    // Create line material
     const wireframeMaterial = new LineMaterial({
       color: waterColor,
       linewidth: wireframeWidth,
       resolution: new THREE.Vector2(size.width, size.height)
     });
 
-    // Create wireframe mesh
     const wireframe = new Wireframe(wireframeGeometry, wireframeMaterial);
     wireframe.computeLineDistances();
+    wireframe.renderOrder = 1;
     
     return wireframe;
   }, [geometry, wireframeWidth, waterColor, size.width, size.height]);
 
+  // Create grid wireframe without diagonals
+  const wireframeWithoutDiagonals = useMemo(() => {
+    // Create arrays to store line positions
+    const positions = [];
+    const vertices = geometry.attributes.position.array;
+
+    // Create horizontal lines
+    for (let i = 0; i <= segments; i++) {
+      for (let j = 0; j < segments; j++) {
+        const idx1 = i * (segments + 1) + j;
+        const idx2 = i * (segments + 1) + (j + 1);
+
+        positions.push(
+          vertices[idx1 * 3], vertices[idx1 * 3 + 1], vertices[idx1 * 3 + 2],
+          vertices[idx2 * 3], vertices[idx2 * 3 + 1], vertices[idx2 * 3 + 2]
+        );
+      }
+    }
+
+    // Create vertical lines
+    for (let i = 0; i < segments; i++) {
+      for (let j = 0; j <= segments; j++) {
+        const idx1 = i * (segments + 1) + j;
+        const idx2 = (i + 1) * (segments + 1) + j;
+
+        positions.push(
+          vertices[idx1 * 3], vertices[idx1 * 3 + 1], vertices[idx1 * 3 + 2],
+          vertices[idx2 * 3], vertices[idx2 * 3 + 1], vertices[idx2 * 3 + 2]
+        );
+      }
+    }
+
+    // Create line segments geometry
+    const lineGeometry = new LineSegmentsGeometry();
+    lineGeometry.setPositions(positions);
+
+    const lineMaterial = new LineMaterial({
+      color: waterColor,
+      linewidth: wireframeWidth,
+      resolution: new THREE.Vector2(size.width, size.height)
+    });
+
+    const lines = new LineSegments2(lineGeometry, lineMaterial);
+    lines.computeLineDistances();
+    lines.renderOrder = 1;
+    
+    return lines;
+  }, [geometry, wireframeWidth, waterColor, size.width, size.height, segments]);
+
   // Update resolution when viewport changes
   useEffect(() => {
-    if (wireframe.material) {
-      (wireframe.material as LineMaterial).resolution.set(
-        size.width,
-        size.height
-      );
+    const activeMaterial = showDiagonals 
+      ? (wireframeWithDiagonals.material as LineMaterial)
+      : (wireframeWithoutDiagonals.material as LineMaterial);
+    
+    if (activeMaterial) {
+      activeMaterial.resolution.set(size.width, size.height);
     }
-  }, [wireframe, size]);
+  }, [wireframeWithDiagonals, wireframeWithoutDiagonals, showDiagonals, size]);
+
+  // Toggle wireframe type with 'w' key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'w') {
+        setShowDiagonals(prev => !prev);
+        console.log('Wireframe with diagonals:', !showDiagonals);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showDiagonals]);
 
   // Create terrain mesh
   const terrainMesh = useMemo(() => {
@@ -133,10 +198,19 @@ const Terrain: React.FC = () => {
       color: 0x5E85B0,
       roughness: 0.8,
       metalness: 0.2,
+      // Enable polygon offset to prevent z-fighting with the wireframe
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1
     });
+    
     const mesh = new THREE.Mesh(geometry, material);
     mesh.receiveShadow = true;
     mesh.castShadow = true;
+    
+    // Set lower render order to ensure it renders before the wireframe
+    mesh.renderOrder = 0;
+    
     return mesh;
   }, [geometry]);
 
@@ -164,7 +238,11 @@ const Terrain: React.FC = () => {
   return (
     <>
       <primitive object={terrainMesh} />
-      <primitive object={wireframe} />
+      {showDiagonals ? (
+        <primitive object={wireframeWithDiagonals} />
+      ) : (
+        <primitive object={wireframeWithoutDiagonals} />
+      )}
       
       {/* Optional debug box to test water intersection */}
       {showDebugBox && (
