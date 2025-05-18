@@ -1,147 +1,132 @@
-# Vertex World MMO Project
+# React + TypeScript + Vite
 
-## 1. Project Vision & Scope
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-This project aims to build a large-scale, stylized 3D world with MMO (Massively Multiplayer Online) resource management gameplay.
+Currently, two official plugins are available:
 
-**Core Ideas:**
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-*   **Huge Map (Potentially Entire World):** Start with a large, procedurally generated or heightmap-based continent/region, designed for future scalability.
-*   **Stylized Visuals:** Employ a low-resolution grid-line aesthetic for the heightmap mesh, achieved via shaders on a dynamically updated single plane.
-*   **Gameplay - MMO Resource Management:** A top-down or isometric perspective where players can place buildings, gather resources, and interact with a persistent world and other players.
-*   **Dynamic Vertex Updates:** The world will be a single, large plane. As the camera/viewport moves, the vertices of the plane will be updated based on the visible portion of a large heightmap.
+## Expanding the ESLint configuration
 
-## 2. Roles
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-*   **AI (Claude):** Programmer. Responsible for implementing the code, solving technical problems, and providing technical advice.
-*   **User (You):** Creative Lead. Responsible for defining the vision, providing feedback, and making creative decisions.
+```js
+export default tseslint.config({
+  extends: [
+    // Remove ...tseslint.configs.recommended and replace with this
+    ...tseslint.configs.recommendedTypeChecked,
+    // Alternatively, use this for stricter rules
+    ...tseslint.configs.strictTypeChecked,
+    // Optionally, add this for stylistic rules
+    ...tseslint.configs.stylisticTypeChecked,
+  ],
+  languageOptions: {
+    // other options...
+    parserOptions: {
+      project: ['./tsconfig.node.json', './tsconfig.app.json'],
+      tsconfigRootDir: import.meta.dirname,
+    },
+  },
+})
+```
 
-## 3. Proposed Tech Stack
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-### Frontend:
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
 
-*   **Rendering Engine:**
-    *   **React Three Fiber (`@react-three/fiber`):** For declarative 3D scene construction using React.
-    *   **`@react-three/drei`:** Essential helpers and components for R3F. ([pmndrs/drei on GitHub](https://github.com/pmndrs/drei))
-*   **Build Tool & Dev Environment:**
-    *   **Vite:** For fast, modern ESM-based development.
-*   **State Management:**
-    *   **Zustand:** Lightweight, hook-based state management for React. ([pmndrs/zustand on GitHub](https://github.com/pmndrs/zustand))
-*   **Animation:**
-    *   **`anime.js`:** For procedural animations. ([juliangarnier/anime on GitHub](https://github.com/juliangarnier/anime))
-    *   *Alternatives:* `@react-spring/three` or `framer-motion` for R3F integration.
-*   **UI Components:**
-    *   Options: Material UI, Chakra UI, Ant Design, or Tailwind CSS.
+export default tseslint.config({
+  plugins: {
+    // Add the react-x and react-dom plugins
+    'react-x': reactX,
+    'react-dom': reactDom,
+  },
+  rules: {
+    // other rules...
+    // Enable its recommended typescript rules
+    ...reactX.configs['recommended-typescript'].rules,
+    ...reactDom.configs.recommended.rules,
+  },
+})
+```
 
-### 3D Map Specifics & Dynamic Vertex Updates:
+# Water Shader Debugging Guide - vertexworld
 
-*   **Single Plane with Dynamic Vertex Updates:**
-    *   **Heightmap Processing:** Tiled heightmaps for the vast world.
-    *   **Dynamic Vertex Updates:** As the camera/viewport moves, calculate which portion of the large heightmap corresponds to the current view. Update the vertices of the single plane to match the heights from that visible portion of the heightmap.
-    *   **Mesh Generation:** Potentially in Web Workers for terrain chunks.
-    *   **LOD Management:** Simulate LOD by reducing the number of segments in the plane for distant views.
-    *   **Instancing:** `THREE.InstancedMesh` via R3F for numerous similar objects.
-    *   *Inspiration:* `surviving-maps-3d` ([Ocelloid/surviving-maps-3d on GitHub](https://github.com/Ocelloid/surviving-maps-3d)).
+## Current Status
 
-### Backend & Multiplayer:
+The water shader in vertexworld has the following status:
 
-*   **Language & Framework Options:**
-    *   **Node.js with TypeScript:**
-        *   **NestJS:** Scalable server-side applications.
-        *   *Alternatives:* Express.js, Fastify.
-    *   **Specialized Game Servers:**
-        *   **Nakama (Heroic Labs):** Open-source, scalable game server.
-        *   **Colyseus:** Open-source multiplayer game server for Node.js.
-*   **Real-time Communication:**
-    *   **WebSockets:** Using libraries like `Socket.IO` or built-in features of Nakama/Colyseus.
-*   **Database:**
-    *   **Primary (Player Data, Game State):** PostgreSQL (with PostGIS for geospatial queries) or MongoDB.
-    *   **Caching/Session Store:** Redis.
-*   **Architecture:** Authoritative server, state synchronization, persistence, long-term scalability considerations.
+- ✅ Controls are now working correctly
+- ✅ Water level adjusts correctly
+- ✅ Foam color updates from the terrainStore
+- ✅ Secondary foam parameters are working
+- ❌ Issue: Only a single line appears down the center instead of outlining the entire terrain intersection
 
-### Version Control:
+## Debug Keyboard Controls
 
-*   **Git & GitHub/GitLab/Bitbucket.**
+We've added several keyboard controls to help debug the water shader:
 
-## 4. Development Plan - Phased Approach
+- Press `d` to toggle debug mode in the water shader (shows depth texture directly)
+- Press `t` to toggle visualization of the depth texture
+- Press `b` to toggle a debug box that should intersect with the water
 
-1.  **Phase 1: Vertical Slice - Core Rendering (Frontend)**
-    *   **Setup:** Initialize project with Vite, React, React Three Fiber, and Drei.
-    *   **Terrain:** Create a single, large, procedurally generated or static heightmap-based terrain plane.
-    *   **Styling:** Implement the grid-line shader on the terrain.
-    *   **Camera:** Set up camera controls suitable for a top-down/isometric view (e.g., `MapControls` or `OrbitControls` from Drei, configured appropriately).
-    *   **Dynamic Vertex Updates:** Implement the logic to update the vertices of the plane based on the camera position and the visible portion of the heightmap.
+## Root Cause Analysis
 
-2.  **Phase 2: LOD & Optimization (Frontend)**
-    *   **LOD Implementation:** Introduce a simple LOD system by reducing the number of segments in the plane for distant views.
-    *   **Performance Optimization:** Profile and optimize the dynamic vertex update process.
-    *   **Consider using Web Workers for vertex calculations.**
+After comparing our implementation with test.html, I've identified these likely causes:
 
-3.  **Phase 3: Basic Gameplay Mechanics (Client-Side)**
-    *   **State Management:** Integrate Zustand for managing UI and client-side game state.
-    *   **Interaction:** Allow basic interaction, e.g., selecting a point on the terrain.
-    *   **Building Placement (Mock):** Implement client-side logic for placing a simple building (e.g., a cube) on the terrain. State managed by Zustand.
+1. **Depth Buffer Capture Issue**
+   - The depth buffer might not be capturing the entire terrain mesh correctly
+   - React Three Fiber's render loop differs from the manual approach in test.html
 
-4.  **Phase 4: Backend Setup & Initial Multiplayer**
-    *   **Server Choice:** Select and set up a basic backend (e.g., Node.js with NestJS or Nakama).
-    *   **Communication:** Implement WebSocket communication.
-    *   **User Accounts:** Basic user authentication and session management.
-    *   **Persistence:** Store basic player data (e.g., position, placed buildings) in a database.
-    *   **Synchronization:** Synchronize the placement of a simple object across connected clients. What one player places, others see.
+2. **Scene Management**
+   - The way we're handling scene.overrideMaterial might be different than test.html
+   - Object visibility might not be properly toggled between render passes
 
-5.  **Phase 5: Expanding Gameplay & Features (Iterative)**
-    *   **Resource System:** Design and implement resource nodes on the map and resource gathering.
-    *   **Building Mechanics:** Develop more complex building types with functions.
-    *   **UI/UX:** Refine the user interface for gameplay actions.
-    *   **Map Expansion:** Gradually increase the size of the explorable world, refining the dynamic vertex update system.
-    *   **Advanced Multiplayer:** Implement more complex interactions, trading, etc.
-    *   **Optimization:** Continuously profile and optimize both frontend and backend performance.
+3. **Shader Uniform Synchronization**
+   - Camera properties and shader uniforms need to be perfectly synchronized
 
-## 5. Todo List
+## Implementation Changes
 
-### Phase 1: Vertical Slice - Core Rendering (Frontend)
+To address these issues, we've made the following changes:
 
-*   [ ] Initialize project with Vite, React, React Three Fiber, and Drei.
-*   [ ] Create a single, large, procedurally generated or static heightmap-based terrain plane.
-*   [ ] Implement the grid-line shader on the terrain.
-*   [ ] Set up camera controls suitable for a top-down/isometric view.
-*   [ ] Implement the logic to update the vertices of the plane based on the camera position and the visible portion of the heightmap.
+1. **Material Handling Improvement**
+   - Now directly setting material on meshes instead of using scene.overrideMaterial
+   - Added explicit tracking of terrain meshes in the scene
 
-### Phase 2: LOD & Optimization (Frontend)
+2. **Debug Visualization**
+   - Added ability to visualize the depth texture directly in the shader
+   - Added a debug box to test water intersections
 
-*   [ ] Introduce a simple LOD system by reducing the number of segments in the plane for distant views.
-*   [ ] Profile and optimize the dynamic vertex update process.
-*   [ ] Consider using Web Workers for vertex calculations.
+3. **Terrain Mesh Refinement**
+   - Made terrain mesh fully opaque for better visibility
+   - Made terrain mesh explicitly cast/receive shadows
 
-### Phase 3: Basic Gameplay Mechanics (Client-Side)
+4. **Improved Scene Management**
+   - Added proper tracking of scene objects
+   - Applied depth material directly to terrain meshes
 
-*   [ ] Integrate Zustand for managing UI and client-side game state.
-*   [ ] Allow basic interaction, e.g., selecting a point on the terrain.
-*   [ ] Implement client-side logic for placing a simple building (e.g., a cube) on the terrain. State managed by Zustand.
+## Next Steps
 
-### Phase 4: Backend Setup & Initial Multiplayer
+If the water shader is still not working correctly, try:
 
-*   [ ] Select and set up a basic backend (e.g., Node.js with NestJS or Nakama).
-*   [ ] Implement WebSocket communication.
-*   [ ] Basic user authentication and session management.
-*   [ ] Store basic player data (e.g., position, placed buildings) in a database.
-*   [ ] Synchronize the placement of a simple object across connected clients.
+1. **Check Console Output**
+   - Look for logs about terrain meshes found (should be > 0)
+   - Verify texture loading is complete
 
-### Phase 5: Expanding Gameplay & Features (Iterative)
+2. **Check Depth Buffer**
+   - Press `t` to visualize the depth buffer
+   - Press `d` to see raw depth values in shader
+   - Press `b` to add a test box that should definitely intersect with water
 
-*   [ ] Design and implement resource nodes on the map and resource gathering.
-*   [ ] Develop more complex building types with functions.
-*   [ ] Refine the user interface for gameplay actions.
-*   [ ] Gradually increase the size of the explorable world, refining the dynamic vertex update system.
-*   [ ] Implement more complex interactions, trading, etc.
-*   [ ] Continuously profile and optimize both frontend and backend performance.
+3. **Compare with test.html**
+   - Compare the real-time behavior with test.html
+   - Review texture parameters and shader uniforms
 
-## 6. Next Immediate Steps
+4. **Alternative Approaches**
+   - If material approach fails, try using custom render passes 
+   - Consider simplifying the shader for testing
 
-1.  Initialize this `vertexworld_mmo` directory as a Git repository.
-2.  Commit this `README.md`.
-3.  Set up the initial Vite + React + R3F project structure within this directory.
-4.  Begin implementing Phase 1: Core Rendering.
-
----
-*This plan is a living document and will evolve as the project progresses.* 
+This document will be updated as we make progress on the water shader implementation.
