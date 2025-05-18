@@ -116,9 +116,21 @@ const Scene: React.FC = () => {
               <Scanlines className="relative flex-1 border-2 border-red-600 glow rounded-lg flex flex-col overflow-hidden">
                 {/* System stats */}
                 <div className="absolute top-4 left-4 flex flex-col gap-2 z-10 pointer-events-auto">
-                  <div className="border-2 border-red-600 glow rounded px-2 py-1 text-xs bg-[#181f2a]">CPU Cores: 128</div>
-                  <div className="border-2 border-red-600 glow rounded px-2 py-1 text-xs bg-[#181f2a]">Bandwidth: 10Gbps</div>
-                  <div className="border-2 border-red-600 glow rounded px-2 py-1 text-xs bg-[#181f2a]">Energon: 75%</div>
+                  <div className="relative">
+                    <div className="scanlines">
+                      <div className="border-2 border-red-600 glow rounded px-2 py-1 text-xs bg-[#181f2a]">CPU Cores: 128</div>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <div className="scanlines">
+                      <div className="border-2 border-red-600 glow rounded px-2 py-1 text-xs bg-[#181f2a]">Bandwidth: 10Gbps</div>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <div className="scanlines">
+                      <div className="border-2 border-red-600 glow rounded px-2 py-1 text-xs bg-[#181f2a]">Energon: 75%</div>
+                    </div>
+                  </div>
                 </div>
                 
                 {/* Center label */}
@@ -127,16 +139,24 @@ const Scene: React.FC = () => {
                 </div>
                 
                 {/* Player stats */}
-                <div className="absolute bottom-20 left-4 w-48 bg-[#181f2a] border-2 border-red-600 glow rounded text-xs z-10 pointer-events-auto">
-                  <div className="bg-red-600 text-[#181f2a] px-2 py-1 uppercase">Player Take</div>
-                  <div className="flex justify-between px-2 py-1 border-t border-red-600"><span>Host</span><span>2,550,000</span></div>
-                  <div className="flex justify-between px-2 py-1 border-t border-red-600"><span>Player 1</span><span>1,200,000</span></div>
-                  <div className="flex justify-between px-2 py-1 border-t border-red-600"><span>Player 2</span><span>900,000</span></div>
+                <div className="absolute bottom-20 left-4 w-48 z-10 pointer-events-auto">
+                  <div className="scanlines">
+                    <div className="bg-[#181f2a] border-2 border-red-600 glow rounded text-xs">
+                      <div className="bg-red-600 text-[#181f2a] px-2 py-1 uppercase">Player Take</div>
+                      <div className="flex justify-between px-2 py-1 border-t border-red-600"><span>Host</span><span>2,550,000</span></div>
+                      <div className="flex justify-between px-2 py-1 border-t border-red-600"><span>Player 1</span><span>1,200,000</span></div>
+                      <div className="flex justify-between px-2 py-1 border-t border-red-600"><span>Player 2</span><span>900,000</span></div>
+                    </div>
+                  </div>
                 </div>
                 
                 {/* Warning */}
-                <div className="absolute bottom-4 right-4 border-2 border-red-600 glow px-4 py-1 uppercase text-xs text-center bg-red-600 text-[#181f2a] rounded warning z-10 pointer-events-auto">
-                  ▲ Hard Mode Active ▲
+                <div className="absolute bottom-4 right-4 z-10 pointer-events-auto">
+                  <div className="scanlines">
+                    <div className="border-2 border-red-600 glow px-4 py-1 uppercase text-xs text-center bg-red-600 text-[#181f2a] rounded warning">
+                      ▲ Hard Mode Active ▲
+                    </div>
+                  </div>
                 </div>
               </Scanlines>
             </div>
