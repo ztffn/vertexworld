@@ -94,3 +94,97 @@ The scanlines effect is defined in `src/index.css`:
 - `tab-active`: Active tab styling
 - `tab-inactive`: Inactive tab styling
 - `warning`: Warning element styling with animation 
+
+## Animations
+
+### Animation Implementation
+
+Animations use anime.js v4 and follow these patterns:
+
+```tsx
+// Import correctly
+import { animate, createScope, createSpring } from 'animejs';
+
+// Create a scope in a useEffect
+useEffect(() => {
+  const scope = createScope();
+  
+  // Clean up animations when component unmounts
+  return () => scope.revert();
+}, []);
+
+// Basic animation
+animate(target, {
+  x: 100,
+  y: 200,
+  duration: 600,
+  ease: 'easeOutQuad'
+});
+
+// Spring physics for natural movement
+animate(target, {
+  x: 100,
+  y: 200,
+  ease: createSpring({ stiffness: 150, damping: 15 }),
+  duration: 600
+});
+```
+
+### Drag Smoothness
+
+For smooth dragging interactions:
+
+1. Store temporary positions in refs to avoid render jitter
+2. Only apply rounding at the final render step
+3. Use spring physics for inertia and natural movement
+4. Clean up ongoing animations when new interactions start
+
+Example pattern:
+```tsx
+// In component
+const tempPosition = useRef({ x: 0, y: 0 });
+const isDragging = useRef(false);
+
+// On drag start
+const handleMouseDown = () => {
+  isDragging.current = true;
+  // Store initial positions
+  tempPosition.current = { ...currentPosition };
+};
+
+// On drag move
+const handleMouseMove = (e) => {
+  if (!isDragging.current) return;
+  
+  // Calculate without rounding for smooth math
+  tempPosition.current = {
+    x: tempPosition.current.x + e.movementX * scale,
+    y: tempPosition.current.y + e.movementY * scale
+  };
+  
+  // Only apply rounding for render
+  setPosition({
+    x: Math.round(tempPosition.current.x),
+    y: Math.round(tempPosition.current.y)
+  });
+};
+
+// On drag end with inertia
+const handleMouseUp = () => {
+  // Apply inertia animation using anime.js
+  animate(tempPosition.current, {
+    x: targetX,
+    y: targetY,
+    ease: createSpring({ stiffness: 150, damping: 15 }),
+    duration: 600,
+    update: () => {
+      setPosition({
+        x: Math.round(tempPosition.current.x),
+        y: Math.round(tempPosition.current.y)
+      });
+    }
+  });
+  
+  isDragging.current = false;
+};
+``` 
