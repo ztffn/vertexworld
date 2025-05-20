@@ -11,11 +11,13 @@ const TerrainGUI: React.FC = () => {
     heightScale,
     segments,
     size,
+    showDiagonals,
     setWireframeWidth,
     setWaterColor,
     setHeightScale,
     setSegments,
     setSize,
+    setShowDiagonals
   } = useTerrainStore();
 
   const {
@@ -66,6 +68,9 @@ const TerrainGUI: React.FC = () => {
       wireframeFolder.addColor({ waterColor }, 'waterColor')
         .name('Color')
         .onChange(setWaterColor);
+      wireframeFolder.add({ showDiagonals }, 'showDiagonals')
+        .name('Show Diagonals')
+        .onChange(setShowDiagonals);
 
       // Water folder
       const waterFolder = gui.addFolder('Water');
@@ -94,6 +99,7 @@ const TerrainGUI: React.FC = () => {
             size: terrainSettings.size,
             wireframeWidth: terrainSettings.wireframeWidth,
             waterColor: terrainSettings.waterColor,
+            showDiagonals: terrainSettings.showDiagonals,
             threshold: waterSettings.threshold,
             waterLevel: waterSettings.waterLevel,
             secondaryFoamScale: waterSettings.secondaryFoamScale,

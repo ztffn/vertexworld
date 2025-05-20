@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import CommandList from "./CommandList";
 import Preview from "./Preview";
 import AssetPreview3D from './AssetPreview3D';
+import TerrainDebugMap from '../TerrainDebugMap';
+import type { HeightmapTile } from '../../utils/heightmapProvider';
 // animejs import and usage will be deferred due to import issues
 
 const tabs = [
@@ -32,9 +34,16 @@ type BuildQueueState = Record<string, BuildQueueItem>;
 
 interface SidebarProps {
   // onCommand prop might be needed if App.tsx handles command logic globally
+  terrainDebugData?: {
+    heightData: HeightmapTile | null;
+    center: { x: number; y: number } | null;
+    zoom: number;
+  };
+  showTerrainDebug?: boolean;
+  onMapClick?: (x: number, y: number) => void;
 }
 
-export default function Sidebar({}: SidebarProps) {
+export default function Sidebar({ terrainDebugData, showTerrainDebug = false, onMapClick }: SidebarProps) {
   const [activeTab, setActiveTab] = useState("intel");
   const [buildQueue, setBuildQueue] = useState<BuildQueueState>({});
   const buildQueueRef = useRef(buildQueue);
@@ -137,7 +146,32 @@ export default function Sidebar({}: SidebarProps) {
       <div className="border-2 border-red-600 h-32 scanlines overflow-hidden flex items-center justify-center glow relative">
         <AssetPreview3D />
       </div>
-      <div className="text-xs uppercase bg-[#181f2a] px-2 py-1 mt-4">Status: Online</div>
+      
+      {/* Terrain Debug Map Section - Always show it */}
+      <div className="border-2 border-red-600 h-64 scanlines overflow-hidden glow relative mt-4">
+        {/* Red/orange overlay with mix-blend-mode */}
+        <div className="absolute inset-0 bg-gradient-to-br from-red-600 to-orange-500 opacity-70 mix-blend-multiply pointer-events-none z-10"></div>
+        
+        <div className="w-full h-full relative">
+          {/* Embed the TerrainDebugMap component with title overlaid */}
+          <div className="w-full h-full mix-blend-screen">
+            <TerrainDebugMap
+              heightData={terrainDebugData?.heightData || null}
+              center={terrainDebugData?.center || null}
+              zoom={terrainDebugData?.zoom || 256}
+              show={true} // Always show
+              onMapClick={onMapClick}
+            />
+          </div>
+          
+          {/* Title overlay - positioned absolutely on top of the map */}
+          <div className="absolute top-2 left-2 z-20 bg-[#181f2a] text-xs uppercase px-2 py-1 text-red-400 inline-block">
+            Terrain Scanner
+          </div>
+        </div>
+      </div>
+      
+      <div className="text-xs uppercase bg-[#181f2a] px-2 py-1 mt-auto">Status: Online</div>
     </div>
   );
 } 

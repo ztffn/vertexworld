@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stats, Grid } from '@react-three/drei';
 import * as THREE from 'three';
@@ -9,35 +9,96 @@ import Sidebar from '../components/ui/Sidebar';
 import Footer from '../components/ui/Footer';
 import CRTNoise from '../components/ui/CRTNoise';
 import Scanlines from '../components/ui/Scanlines';
+import StatBox from '../components/ui/StatBox';
+import PlayerTakeTable from '../components/ui/PlayerTakeTable';
+import WarningBanner from '../components/ui/WarningBanner';
+import { glowAnimation, warningAnimation } from '../utils/animations';
+import type { HeightmapTile } from '../utils/heightmapProvider';
+import TerrainDebugMap from '../components/TerrainDebugMap';
 
-const Scene: React.FC = () => {
+interface SceneProps {
+  onDebugData?: (data: {
+    heightData: HeightmapTile | null;
+    center: { x: number; y: number } | null;
+    zoom: number;
+  }) => void;
+}
+
+const Scene: React.FC<SceneProps> = ({ onDebugData }) => {
+  // Debug overlay state - set to true by default to always show
+  const [showDebugHeightmap, setShowDebugHeightmap] = useState(true);
+  // const [heightData, setHeightData] = useState<HeightmapTile | null>(null); // Removed: Managed by TerrainDebugMap
+  // const debugCanvasRef = useRef<HTMLCanvasElement>(null); // Removed: Managed by TerrainDebugMap
+
+  // State for data from Terrain component to pass to TerrainDebugMap
+  const [terrainDebugData, setTerrainDebugData] = useState<{
+    heightData: HeightmapTile | null;
+    center: { x: number; y: number } | null;
+    zoom: number;
+  }>({ heightData: null, center: null, zoom: 256 });
+
+  // Track clicked position for updating Terrain
+  const [clickedCenter, setClickedCenter] = useState<{ x: number; y: number } | null>(null);
+
+  // Add a reference to the OrbitControls
+  const orbitControlsRef = useRef(null);
+
+  // Listen for 'h' key globally to toggle debug map visibility
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'h') setShowDebugHeightmap(v => !v);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Forward terrain debug data to parent component if needed
+  useEffect(() => {
+    if (onDebugData && terrainDebugData.heightData) {
+      onDebugData(terrainDebugData);
+    }
+  }, [terrainDebugData, onDebugData]);
+
+  // Removed: Old useEffect for drawing heightmap to canvas. This is now handled by TerrainDebugMap.
+
   // Effect for animations
   useEffect(() => {
     // Import anime.js dynamically
     import('animejs').then(({ animate }) => {
       // Animate glowing elements
-      animate('.glow', {
-        boxShadow: ['0 0 2px rgba(255,50,50,0.3)', '0 0 6px rgba(255,50,50,0.5)'],
-        duration: 2000,
-        easing: 'inOutSine',
-        direction: 'alternate',
-        loop: true
-      });
+      animate('.glow', glowAnimation);
 
       // Animate warning element
-      animate('.warning', {
-        opacity: [0.6, 1],
-        duration: 1000,
-        easing: 'inOutSine',
-        direction: 'alternate',
-        loop: true
-      });
+      animate('.warning', warningAnimation);
     });
+  }, []);
+
+  const stats = [
+    { label: 'CPU Cores', value: '128' },
+    { label: 'Bandwidth', value: '10Gbps' },
+    { label: 'Energon', value: '75%' }
+  ];
+
+  const players = [
+    { name: 'Host', value: 2550000 },
+    { name: 'Player 1', value: 1200000 },
+    { name: 'Player 2', value: 900000 }
+  ];
+
+  // Handler for when user clicks on the map in TerrainDebugMap
+  const handleMapClick = useCallback((x: number, y: number) => {
+    console.log(`[Scene] Map clicked at x=${x}, y=${y}`);
+    // Store the clicked position
+    setClickedCenter({ x, y });
+    // Also update terrainDebugData to keep sidebar in sync
+    setTerrainDebugData(prev => ({
+      ...prev,
+      center: { x, y },
+    }));
   }, []);
 
   return (
     <div className="relative w-full h-full">
-      {/* Original Canvas with all 3D elements - nothing changed */}
       <Canvas
         className="absolute inset-0"
         camera={{
@@ -78,18 +139,32 @@ const Scene: React.FC = () => {
         />
         
         {/* Terrain */}
-        <Terrain />
+        <Terrain 
+          onDebugData={setTerrainDebugData} 
+          orbitControlsRef={orbitControlsRef} 
+          externalCenter={clickedCenter}
+        />
         
         {/* Water */}
         <Water />
         
-        {/* Controls */}
+        {/* Controls - completely disable default mouse behaviors */}
         <OrbitControls 
+          ref={orbitControlsRef}
+          makeDefault
           enableDamping 
           dampingFactor={0.05}
           minDistance={50}
           maxDistance={1000}
           maxPolarAngle={Math.PI / 2}
+          enableRotate={false}  // Disable default rotation
+          enablePan={false}     // Disable default panning
+          enableZoom={true}     // Keep zoom enabled
+          mouseButtons={{
+            LEFT: THREE.MOUSE.ROTATE,  // Regular click always rotates
+            MIDDLE: THREE.MOUSE.DOLLY, // Middle button zooms
+            RIGHT: THREE.MOUSE.ROTATE  // Right click also rotates (effectively disabled)
+          }}
         />
         
         {/* Stats */}
@@ -105,9 +180,13 @@ const Scene: React.FC = () => {
       <div className="absolute inset-0 pointer-events-none flex flex-col z-10">
         {/* Main row */}
         <div className="flex flex-1 min-h-0">
-          {/* Sidebar - with 0.4 opacity background */}
+          {/* Sidebar - with 0.4 opacity background - Pass terrain debug data */}
           <Scanlines className="w-[340px] min-w-[340px] max-w-[340px] bg-[#181f2a] bg-opacity-90 border-r-2 border-red-600 glow flex flex-col p-4 gap-4 pointer-events-auto">
-            <Sidebar />
+            <Sidebar 
+              terrainDebugData={terrainDebugData}
+              showTerrainDebug={showDebugHeightmap}
+              onMapClick={handleMapClick}
+            />
           </Scanlines>
           
           {/* Main window area */}
@@ -116,21 +195,9 @@ const Scene: React.FC = () => {
               <Scanlines className="relative flex-1 border-2 border-red-600 glow rounded-lg flex flex-col overflow-hidden">
                 {/* System stats */}
                 <div className="absolute top-4 left-4 flex flex-col gap-2 z-10 pointer-events-auto">
-                  <div className="relative">
-                    <div className="scanlines">
-                      <div className="border-2 border-red-600 glow rounded px-2 py-1 text-xs bg-[#181f2a]">CPU Cores: 128</div>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <div className="scanlines">
-                      <div className="border-2 border-red-600 glow rounded px-2 py-1 text-xs bg-[#181f2a]">Bandwidth: 10Gbps</div>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <div className="scanlines">
-                      <div className="border-2 border-red-600 glow rounded px-2 py-1 text-xs bg-[#181f2a]">Energon: 75%</div>
-                    </div>
-                  </div>
+                  {stats.map(stat => (
+                    <StatBox key={stat.label} label={stat.label} value={stat.value} />
+                  ))}
                 </div>
                 
                 {/* Center label */}
@@ -139,24 +206,13 @@ const Scene: React.FC = () => {
                 </div>
                 
                 {/* Player stats */}
-                <div className="absolute bottom-20 left-4 w-48 z-10 pointer-events-auto">
-                  <div className="scanlines">
-                    <div className="bg-[#181f2a] border-2 border-red-600 glow rounded text-xs">
-                      <div className="bg-red-600 text-[#181f2a] px-2 py-1 uppercase">Player Take</div>
-                      <div className="flex justify-between px-2 py-1 border-t border-red-600"><span>Host</span><span>2,550,000</span></div>
-                      <div className="flex justify-between px-2 py-1 border-t border-red-600"><span>Player 1</span><span>1,200,000</span></div>
-                      <div className="flex justify-between px-2 py-1 border-t border-red-600"><span>Player 2</span><span>900,000</span></div>
-                    </div>
-                  </div>
+                <div className="absolute bottom-20 left-4 z-10 pointer-events-auto">
+                  <PlayerTakeTable players={players} />
                 </div>
                 
                 {/* Warning */}
                 <div className="absolute bottom-4 right-4 z-10 pointer-events-auto">
-                  <div className="scanlines">
-                    <div className="border-2 border-red-600 glow px-4 py-1 uppercase text-xs text-center bg-red-600 text-[#181f2a] rounded warning">
-                      ▲ Hard Mode Active ▲
-                    </div>
-                  </div>
+                  <WarningBanner message="Hard Mode Active" />
                 </div>
               </Scanlines>
             </div>

@@ -1,38 +1,65 @@
 const express = require('express');
 const cors = require('cors');
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const { GeoTIFF } = require('geotiff');
 
-const API_KEY = '2c23752a27db60c1d1b2a1c9ba672980'; // keep this secret!
 const app = express();
-const PORT = 4000;
+const port = 4000;
 
 app.use(cors());
 
 app.get('/api/heightmap', async (req, res) => {
-  const { south, north, west, east } = req.query;
-  console.log(`[proxy] Received request: south=${south} north=${north} west=${west} east=${east}`);
-  if (!south || !north || !west || !east) {
-    console.log('[proxy] Missing bbox params');
-    return res.status(400).json({ error: 'Missing bbox params' });
-  }
-  const url = `https://portal.opentopography.org/API/globaldem?demtype=SRTMGL1&south=${south}&north=${north}&west=${west}&east=${east}&outputFormat=AAIGrid&API_Key=${API_KEY}`;
   try {
-    const fetch = (await import('node-fetch')).default;
-    console.log(`[proxy] Fetching from OpenTopo: ${url}`);
+    const { south, north, west, east } = req.query;
+    const apiKey = '2c23752a27db60c1d1b2a1c9ba672980';
+    
+    const url = `https://portal.opentopography.org/API/globaldem?demtype=SRTMGL3&south=${south}&north=${north}&west=${west}&east=${east}&outputFormat=GTiff&API_Key=${apiKey}`;
+    
+    console.log('Fetching from OpenTopography:', url);
+    
     const response = await fetch(url);
     if (!response.ok) {
-      const errText = await response.text();
-      console.log(`[proxy] OpenTopo error: ${response.status} ${errText.slice(0, 200)}`);
-      return res.status(response.status).send(errText);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-    const text = await response.text();
-    console.log(`[proxy] Success, sending response (${text.length} chars)`);
-    res.type('text/plain').send(text);
-  } catch (err) {
-    console.log('[proxy] Exception:', err);
-    res.status(500).json({ error: err.message });
+    
+    // Get the GeoTIFF data as ArrayBuffer
+    const arrayBuffer = await response.arrayBuffer();
+    
+    // Parse the GeoTIFF
+    const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+    const image = await tiff.getImage();
+    const rasters = await image.readRasters();
+    
+    // Get the elevation data (first band)
+    const elevationData = rasters[0];
+    const width = image.getWidth();
+    const height = image.getHeight();
+    
+    // Convert to 2D array
+    const data = [];
+    for (let y = 0; y < height; y++) {
+      const row = [];
+      for (let x = 0; x < width; x++) {
+        const idx = y * width + x;
+        // Normalize to 0-255 range
+        const value = Math.max(0, Math.min(255, (elevationData[idx] + 1000) / 8000 * 255));
+        row.push(value);
+      }
+      data.push(row);
+    }
+    
+    res.json({
+      width,
+      height,
+      data
+    });
+    
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`OpenTopo proxy running on http://localhost:${PORT}`);
+app.listen(port, () => {
+  console.log(`OpenTopo proxy running on http://localhost:${port}`);
 }); 

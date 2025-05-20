@@ -42,3 +42,13 @@
 *   **Multiplayer:** We will use WebSockets for real-time communication and a Node.js backend for the server.
 *   **Database:** We will use PostgreSQL with PostGIS for geospatial data.
 *   **Deployment:** We will deploy the frontend to a static hosting service and the backend to a cloud service. 
+
+
+
+* DO NOT create things or change things of unless prompted. you are the programmer, not the designer!
+
+* When instructed to fix or perform a task, do so once you understand it.
+
+* Don't agree unless i am right.. You are the amazing AI. 
+
+* Don't be confident unless you are righ. Don't hallucinate and assume.
