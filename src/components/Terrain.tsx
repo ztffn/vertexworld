@@ -19,22 +19,14 @@ const provider = new OpenTopographyProvider('2c23752a27db60c1d1b2a1c9ba672980');
 interface TerrainProps {
   setHeightData?: (data: HeightmapTile | null) => void;
   onDebugData?: (data: { heightData: HeightmapTile | null, center: {x: number, y: number} | null, zoom: number }) => void;
-  orbitControlsRef?: React.RefObject<any>;
   externalCenter?: { x: number, y: number } | null;
+  orbitControlsRef?: React.RefObject<any>;
 }
 
-const Terrain: React.FC<TerrainProps> = ({ setHeightData, onDebugData, orbitControlsRef, externalCenter }) => {
+const Terrain: React.FC<TerrainProps> = ({ setHeightData, onDebugData, externalCenter, orbitControlsRef }) => {
   const [heightData, _setHeightData] = useState<HeightmapTile | null>(null);
   const size = useThree((state) => state.size);
-  const camera = useThree((state) => state.camera);
   const [terrainMeshRef, setTerrainMeshRef] = useState<THREE.Mesh | null>(null);
-  
-  // Mouse interaction states
-  const isDraggingRef = useRef(false);
-  const isRotatingRef = useRef(false);
-  const lastMousePos = useRef({ x: 0, y: 0 });
-  const dragStartPos = useRef({ x: 0, y: 0 });
-  const isDragging = useRef(false);
   
   // Animation state
   const isAnimating = useRef(false);
@@ -42,6 +34,13 @@ const Terrain: React.FC<TerrainProps> = ({ setHeightData, onDebugData, orbitCont
   const animation = useRef<any>(null);
   const tempCenterRef = useRef<{ x: number; y: number } | null>(null);
   const animScope = useRef<any>(null);
+  
+  // Mouse interaction states
+  const isDraggingRef = useRef(false);
+  const lastMousePos = useRef({ x: 0, y: 0 });
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const isDragging = useRef(false);
+  const shiftPressedRef = useRef(false);
   
   const {
     wireframeWidth,
@@ -110,32 +109,36 @@ const Terrain: React.FC<TerrainProps> = ({ setHeightData, onDebugData, orbitCont
       }
     });
   }, [center, heightData]);
-  
-  // --- Mouse interaction handlers ---
+
+  // Handle key events for modifier keys
   useEffect(() => {
-    const canvasElement = document.querySelector('canvas');
-    if (!canvasElement) return;
-    
-    // Track if shift key is pressed
-    let shiftPressed = false;
-    
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Shift') {
-        shiftPressed = true;
+        shiftPressedRef.current = true;
       }
     };
     
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Shift') {
-        shiftPressed = false;
-        isRotatingRef.current = false;
+        shiftPressedRef.current = false;
       }
     };
     
-    // Mouse down handler
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Custom mouse event handling
+  useEffect(() => {
+    const canvasElement = document.querySelector('canvas');
+    if (!canvasElement || !heightData || !center) return;
+    
     const handleMouseDown = (e: MouseEvent) => {
-      if (!heightData || !center) return;
-      
       // Stop any running animations
       if (isAnimating.current && animScope.current) {
         animScope.current.revert();
@@ -147,81 +150,57 @@ const Terrain: React.FC<TerrainProps> = ({ setHeightData, onDebugData, orbitCont
       dragStartPos.current = { x: center.x, y: center.y };
       tempCenterRef.current = { ...center };
       
-      if (shiftPressed) {
-        // Shift+drag = rotation
-        isRotatingRef.current = true;
-        isDraggingRef.current = false;
-        isDragging.current = false;
+      if (shiftPressedRef.current) {
+        // Shift+drag = rotation (handled by OrbitControls)
+        if (orbitControlsRef?.current) {
+          orbitControlsRef.current.enableRotate = true;
+        }
       } else {
-        // Regular drag = pan terrain
+        // Regular drag = terrain pan (custom handling)
         isDraggingRef.current = true;
-        isRotatingRef.current = false;
         isDragging.current = true;
+        
+        // Disable rotation in OrbitControls to prevent conflicts
+        if (orbitControlsRef?.current) {
+          orbitControlsRef.current.enableRotate = false;
+        }
       }
     };
     
-    // Mouse move handler
     const handleMouseMove = (e: MouseEvent) => {
-      if (!heightData || !center || !tempCenterRef.current) return;
+      if (!isDraggingRef.current || !heightData || !center || !tempCenterRef.current) return;
       
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
       
-      if (isRotatingRef.current && orbitControlsRef?.current) {
-        // Handle rotation manually
-        const orbit = orbitControlsRef.current;
-        const rotateSpeed = 1.0;
-        
-        // The orbit controls internal API
-        const orbitObj = orbit as any;
-        if (orbitObj.rotateLeft && orbitObj.rotateUp) {
-          orbitObj.rotateLeft(dx * 0.01 * rotateSpeed);
-          orbitObj.rotateUp(dy * 0.01 * rotateSpeed);
-          orbitObj.update();
-        } 
-        else if (orbitObj.spherical && orbitObj.sphericalDelta) {
-          orbitObj.sphericalDelta.theta -= dx * 0.01 * rotateSpeed;
-          orbitObj.sphericalDelta.phi -= dy * 0.01 * rotateSpeed;
-          orbitObj.update();
-        }
-        else if (camera instanceof THREE.PerspectiveCamera) {
-          camera.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), -dx * 0.01 * rotateSpeed);
-          camera.position.applyAxisAngle(new THREE.Vector3(1, 0, 0), -dy * 0.01 * rotateSpeed);
-          camera.lookAt(0, 0, 0);
-        }
-      } 
-      else if (isDraggingRef.current) {
-        // Calculate the new center position based on mouse movement
-        // Use a smoother scaling factor based on zoom level
-        const scale = Math.max(0.5, zoom / 512);  // Adjust scale based on zoom level
-        
-        const moveX = dx * scale;
-        const moveY = dy * scale;
-        
-        // Update the temporary center position (stored in ref to avoid re-renders)
-        tempCenterRef.current = {
-          x: dragStartPos.current.x - moveX,
-          y: dragStartPos.current.y + moveY  // Invert Y because heightmap Y is top-to-bottom
-        };
-        
-        // Clamp to ensure the sampling window stays within the heightmap
-        const half = Math.floor(zoom / 2);
-        tempCenterRef.current.x = Math.max(half, Math.min(heightData.width - half, tempCenterRef.current.x));
-        tempCenterRef.current.y = Math.max(half, Math.min(heightData.height - half, tempCenterRef.current.y));
-        
-        // Update state with smoothed value
-        setCenter({
-          x: Math.round(tempCenterRef.current.x),
-          y: Math.round(tempCenterRef.current.y)
-        });
-      }
+      // Calculate the new center position based on mouse movement
+      // Use a smoother scaling factor based on zoom level
+      const scale = Math.max(0.5, zoom / 512);  // Adjust scale based on zoom level
+      
+      const moveX = -dx * scale;
+      const moveY = -dy * scale;
+      
+      // Update the temporary center position (stored in ref to avoid re-renders)
+      tempCenterRef.current = {
+        x: dragStartPos.current.x + moveX,  // Remove the negative sign to fix inverted horizontal drag
+        y: dragStartPos.current.y + moveY  // Keep Y as is since it's working correctly
+      };
+      
+      // Clamp to ensure the sampling window stays within the heightmap
+      const half = Math.floor(zoom / 2);
+      tempCenterRef.current.x = Math.max(half, Math.min(heightData.width - half, tempCenterRef.current.x));
+      tempCenterRef.current.y = Math.max(half, Math.min(heightData.height - half, tempCenterRef.current.y));
+      
+      // Update state with smoothed value
+      setCenter({
+        x: Math.round(tempCenterRef.current.x),
+        y: Math.round(tempCenterRef.current.y)
+      });
     };
     
-    // Mouse up handler with inertia for natural feel
     const handleMouseUp = (e: MouseEvent) => {
       if (!heightData || !center || !isDragging.current || !tempCenterRef.current) {
         isDraggingRef.current = false;
-        isRotatingRef.current = false;
         isDragging.current = false;
         return;
       }
@@ -257,70 +236,39 @@ const Terrain: React.FC<TerrainProps> = ({ setHeightData, onDebugData, orbitCont
       }
       
       isDraggingRef.current = false;
-      isRotatingRef.current = false;
       isDragging.current = false;
       tempCenterRef.current = null;
+      
+      // Restore original OrbitControls settings
+      if (orbitControlsRef?.current) {
+        orbitControlsRef.current.enableRotate = true;
+      }
     };
     
-    // Blur handler
-    const handleBlur = () => {
-      isDraggingRef.current = false;
-      isRotatingRef.current = false;
-      isDragging.current = false;
-    };
-    
-    // Add all event listeners
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
     canvasElement.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('blur', handleBlur);
     
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
       canvasElement.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('blur', handleBlur);
     };
-  }, [heightData, center, zoom, orbitControlsRef, camera, animateToPosition]);
+  }, [heightData, center, zoom, orbitControlsRef, animateToPosition]);
 
-  // --- Keyboard controls for panning and zooming ---
+  // --- Keyboard controls for zooming ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!heightData || !center) return;
       
-      // Don't handle arrow keys if they're meant for other UI elements
+      // Don't handle keys if they're meant for other UI elements
       if (e.target instanceof HTMLInputElement || 
           e.target instanceof HTMLTextAreaElement ||
           e.target instanceof HTMLSelectElement) {
         return;
       }
       
-      let targetX = center.x;
-      let targetY = center.y;
-      let changed = false;
-      const panStep = Math.max(4, Math.floor(zoom / 16));
-      
       switch (e.key) {
-        case 'ArrowUp':
-          targetY = Math.max(0, targetY - panStep);
-          changed = true;
-          break;
-        case 'ArrowDown':
-          targetY = Math.min(heightData.height - 1, targetY + panStep);
-          changed = true;
-          break;
-        case 'ArrowLeft':
-          targetX = Math.max(0, targetX - panStep);
-          changed = true;
-          break;
-        case 'ArrowRight':
-          targetX = Math.min(heightData.width - 1, targetX + panStep);
-          changed = true;
-          break;
         case '+':
         case '=':
           setZoom(z => Math.max(16, z - 32));
@@ -332,21 +280,11 @@ const Terrain: React.FC<TerrainProps> = ({ setHeightData, onDebugData, orbitCont
         default:
           break;
       }
-      
-      // Clamp center so region stays in bounds
-      const half = Math.floor(zoom / 2);
-      targetX = Math.max(half, Math.min(heightData.width - half, targetX));
-      targetY = Math.max(half, Math.min(heightData.height - half, targetY));
-      
-      if (changed) {
-        // Animate movement for keyboard controls too
-        animateToPosition(targetX, targetY, 300);
-      }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [center, heightData, zoom, animateToPosition]);
+  }, [center, heightData]);
 
   // --- Extract region from heightmap based on center and zoom ---
   const regionData = useMemo(() => {
@@ -373,6 +311,7 @@ const Terrain: React.FC<TerrainProps> = ({ setHeightData, onDebugData, orbitCont
   const geometry = useMemo(() => {
     const planeGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize, segments, segments);
     planeGeometry.rotateX(-Math.PI / 2);
+    planeGeometry.rotateY(Math.PI);
 
     if (regionData) {
       const { data: rData, width: rWidth, height: rHeight } = regionData;
@@ -401,7 +340,7 @@ const Terrain: React.FC<TerrainProps> = ({ setHeightData, onDebugData, orbitCont
         
         // Map to pixel coordinates in the regionData
         const px = Math.floor(u * (rWidth - 1));
-        const py = Math.floor((1 - v) * (rHeight - 1));
+        const py = Math.floor(v * (rHeight - 1));
         
         // Clamp to valid range
         const validPx = Math.max(0, Math.min(px, rWidth - 1));
@@ -509,22 +448,13 @@ const Terrain: React.FC<TerrainProps> = ({ setHeightData, onDebugData, orbitCont
         });
     };
     
-    console.log('[Terrain.tsx] Setting image source to /assets/cropped_norw_1024.png');
+    console.log('[Terrain.tsx] Setting image source to /assets/worldHeightMap.jpg');
     // Force an absolute URL to avoid path issues
     const baseUrl = window.location.origin;
-    const imageUrl = `${baseUrl}/assets/cropped_norw_1024.png`;
+    const imageUrl = `${baseUrl}/assets/worldHeightMap_hicontrast.png`;
     console.log('[Terrain.tsx] Full image URL:', imageUrl);
     img.src = imageUrl;
   }, [setHeightData, onDebugData]);
-
-  // Calculate sampling rate based on camera distance
-  const getSamplingRate = (cameraDistance: number) => {
-    // Adjust these values to control the zoom levels
-    if (cameraDistance < 200) return 1; // Max zoom: sample every pixel
-    if (cameraDistance < 400) return 2; // Medium zoom: sample every 2nd pixel
-    if (cameraDistance < 600) return 4; // Far zoom: sample every 4th pixel
-    return 8; // Very far: sample every 8th pixel
-  };
 
   // Create wireframe using the WireframeGeometry2 approach (with diagonals)
   const wireframeWithDiagonals = useMemo(() => {
@@ -700,11 +630,11 @@ const Terrain: React.FC<TerrainProps> = ({ setHeightData, onDebugData, orbitCont
 
   return (
     <>
-      <primitive object={terrainMesh} />
+      <primitive object={terrainMesh} style={{ cursor: 'grab' }} />
       {showDiagonals ? (
-        <primitive object={wireframeWithDiagonals} />
+        <primitive object={wireframeWithDiagonals} style={{ cursor: 'grab' }} />
       ) : (
-        <primitive object={wireframeWithoutDiagonals} />
+        <primitive object={wireframeWithoutDiagonals} style={{ cursor: 'grab' }} />
       )}
       {showDebugBox && (
         <mesh position={[0, 50, 0]}>

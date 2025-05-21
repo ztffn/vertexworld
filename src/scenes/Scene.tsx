@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Stats, Grid } from '@react-three/drei';
+import { Stats, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 import Terrain from '../components/Terrain';
 import Water from '../components/Water';
@@ -15,6 +15,8 @@ import WarningBanner from '../components/ui/WarningBanner';
 import { glowAnimation, warningAnimation } from '../utils/animations';
 import type { HeightmapTile } from '../utils/heightmapProvider';
 import TerrainDebugMap from '../components/TerrainDebugMap';
+import CameraController from '../components/CameraController';
+import ViewportRuler from '../components/ViewportRuler';
 
 interface SceneProps {
   onDebugData?: (data: {
@@ -42,6 +44,9 @@ const Scene: React.FC<SceneProps> = ({ onDebugData }) => {
 
   // Add a reference to the OrbitControls
   const orbitControlsRef = useRef(null);
+
+  // Track camera position
+  const [cameraPosition, setCameraPosition] = useState<THREE.Vector3>(new THREE.Vector3(0, 200, 200));
 
   // Listen for 'h' key globally to toggle debug map visibility
   useEffect(() => {
@@ -100,14 +105,13 @@ const Scene: React.FC<SceneProps> = ({ onDebugData }) => {
   return (
     <div className="relative w-full h-full">
       <Canvas
-        className="absolute inset-0"
+        shadows
         camera={{
-          position: [400, 200, 0],
+          position: [0, 200, -200],
           fov: 60,
           near: 1,
-          far: 3000
+          far: 1000
         }}
-        shadows
       >
         <color attach="background" args={['#1d3d70']} />
         <fog attach="fog" args={['#1d3d70', 0.001]} />
@@ -141,30 +145,25 @@ const Scene: React.FC<SceneProps> = ({ onDebugData }) => {
         {/* Terrain */}
         <Terrain 
           onDebugData={setTerrainDebugData} 
-          orbitControlsRef={orbitControlsRef} 
           externalCenter={clickedCenter}
+          orbitControlsRef={orbitControlsRef}
         />
         
         {/* Water */}
         <Water />
         
-        {/* Controls - completely disable default mouse behaviors */}
-        <OrbitControls 
+        {/* Camera Controller */}
+        <CameraController 
           ref={orbitControlsRef}
-          makeDefault
-          enableDamping 
-          dampingFactor={0.05}
-          minDistance={50}
-          maxDistance={1000}
-          maxPolarAngle={Math.PI / 2}
-          enableRotate={false}  // Disable default rotation
-          enablePan={false}     // Disable default panning
-          enableZoom={true}     // Keep zoom enabled
-          mouseButtons={{
-            LEFT: THREE.MOUSE.ROTATE,  // Regular click always rotates
-            MIDDLE: THREE.MOUSE.DOLLY, // Middle button zooms
-            RIGHT: THREE.MOUSE.ROTATE  // Right click also rotates (effectively disabled)
+          onCameraMove={(position, target) => {
+            setCameraPosition(position);
+            console.log('Camera moved:', position, target);
           }}
+          minDistance={100}
+          maxDistance={500}
+          enableRotate={true}
+          enablePan={true}
+          enableZoom={true}
         />
         
         {/* Stats */}
@@ -213,6 +212,15 @@ const Scene: React.FC<SceneProps> = ({ onDebugData }) => {
                 {/* Warning */}
                 <div className="absolute bottom-4 right-4 z-10 pointer-events-auto">
                   <WarningBanner message="Hard Mode Active" />
+                </div>
+
+                {/* Viewport Ruler */}
+                <div className="absolute bottom-0 left-0 right-0 z-10">
+                  <ViewportRuler 
+                    zoom={terrainDebugData.zoom / 256}  // Convert terrain zoom to display zoom
+                    center={terrainDebugData.center || { x: 0, y: 0 }}
+                    cameraPosition={cameraPosition}
+                  />
                 </div>
               </Scanlines>
             </div>
